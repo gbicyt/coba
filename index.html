@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<!-- saved from url=(0022)https://cepatcloud.id/ -->
+<html class="html" lang="id"><script src="./index_files/f.txt"></script><script src="./index_files/f(1).txt" id="google_shimpl"></script><script type="text/javascript" async="" src="./index_files/js"></script><script type="text/javascript" async="" src="./index_files/analytics.js.download"></script><script type="text/javascript" async="" src="./index_files/js(1)"></script><script>
+    window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+    constructor(name, destination) {
+        this.name = name;
+        this.destination = destination;
+        this.serverListeners = {};
+        this.bgRequestsListeners = {};
+        this.bgEventsListeners = {};
+        window.addEventListener('message', (message) => {
+            const data = message.data;
+            const isNotForMe = !(data.destination && data.destination === this.name);
+            const hasNotEventProp = !data.event;
+            if (isNotForMe || hasNotEventProp) {
+                return;
+            }
+            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+                const response = data.args;
+                if (this.hasBgRequestListener(response.requestId)) {
+                    try {
+                        this.bgRequestsListeners[response.requestId](response.response);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                    delete this.bgRequestsListeners[response.requestId];
+                }
+            }
+            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+                const response = data.args;
+                if (this.hasBgEventListener(response.event)) {
+                    try {
+                        this.bgEventsListeners[data.id](response.payload);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+            else if (this.hasServerListener(data.event)) {
+                try {
+                    this.serverListeners[data.event](data.args);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else {
+                console.log(`event not handled: ${data.event}`);
+            }
+        });
+    }
+    emitToServer(event, args) {
+        const id = this.generateUIID();
+        const message = {
+            args,
+            destination: this.destination,
+            event,
+            id,
+        };
+        window.postMessage(message, location.origin);
+        return id;
+    }
+    emitToBg(bgEventName, args) {
+        const requestId = this.generateUIID();
+        const request = { bgEventName, requestId, args };
+        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+        return requestId;
+    }
+    hasServerListener(event) {
+        return !!this.serverListeners[event];
+    }
+    hasBgRequestListener(requestId) {
+        return !!this.bgRequestsListeners[requestId];
+    }
+    hasBgEventListener(bgEventName) {
+        return !!this.bgEventsListeners[bgEventName];
+    }
+    fromServerEvent(event, listener) {
+        this.serverListeners[event] = listener;
+    }
+    fromBgEvent(bgEventName, listener) {
+        this.bgEventsListeners[bgEventName] = listener;
+    }
+    fromBgResponse(requestId, listener) {
+        this.bgRequestsListeners[requestId] = listener;
+    }
+    generateUIID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><script>
+    const hideMyLocation = new (class HideMyLocation {
+    constructor(clientKey) {
+        this.clientKey = clientKey;
+        this.watchIDs = {};
+        this.client = window[Symbol.for(clientKey)];
+        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+        const watchPosition = navigator.geolocation.watchPosition;
+        const clearWatch = navigator.geolocation.clearWatch;
+        const self = this;
+        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.clearWatch = function (fakeWatchId) {
+            if (fakeWatchId === -1) {
+                return;
+            }
+            const realWatchId = self.watchIDs[fakeWatchId];
+            delete self.watchIDs[fakeWatchId];
+            return clearWatch.apply(this, [realWatchId]);
+        };
+    }
+    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+        let fakeWatchId = this.getRandomInt(0, 100000);
+        this.client.fromBgResponse(requestId, (response) => {
+            if (response.enabled) {
+                if (response.status === 'SUCCESS') {
+                    const position = this.map(response);
+                    successCallback(position);
+                }
+                else {
+                    const error = this.errorObj();
+                    errorCallback(error);
+                    fakeWatchId = -1;
+                }
+            }
+            else {
+                const args = [successCallback, errorCallback, options];
+                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+                if (type === 'WATCH') {
+                    this.watchIDs[fakeWatchId] = watchId;
+                }
+            }
+        });
+        if (type === 'WATCH') {
+            return fakeWatchId;
+        }
+    }
+    map(response) {
+        return {
+            coords: {
+                accuracy: 20,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                latitude: response.latitude,
+                longitude: response.longitude,
+                speed: null,
+            },
+            timestamp: Date.now(),
+        };
+    }
+    errorObj() {
+        return {
+            code: 1,
+            message: 'User denied Geolocation',
+        };
+    }
+    getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+  </script><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><script data-no-optimize="1">var litespeed_docref=sessionStorage.getItem("litespeed_docref");litespeed_docref&&(Object.defineProperty(document,"referrer",{get:function(){return litespeed_docref}}),sessionStorage.removeItem("litespeed_docref"));</script>
+
+<link rel="profile" href="https://gmpg.org/xfn/11">
+
+<script>
+window["ga-disable-UA-37674340-4"] = true;
+</script>
+<script>
+window["ga-disable-G-RJJY7MDRGP"] = true;
+</script>
+
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Hosting Cloud Indonesia</title>
+<meta name="description" content="Hosting Cloud Sekarang Di Lee Cloud Dengan Harga Yang Murah.">
+<link rel="canonical" href="https://leecloudid.xyz/">
+<meta property="og:locale" content="id_ID">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Hosting Cloud Indonesia">
+<meta property="og:description" content="Hosting Cloud Sekarang Di Lee Cloud Dengan Harga Yang Murah.">
+<meta property="og:url" content="https://leecloudid.xyz/">
+<meta property="og:site_name" content="Lee Cloud">
+<meta property="article:modified_time" content="2023-06-22T09:43:58+00:00">
+<meta property="og:image" content="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc.webp">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://cepatcloud.id/","url":"https://cepatcloud.id/","name":"Hosting VPS Gratis Indonesia","isPartOf":{"@id":"https://cepatcloud.id/#website"},"about":{"@id":"https://cepatcloud.id/#organization"},"primaryImageOfPage":{"@id":"https://cepatcloud.id/#primaryimage"},"image":{"@id":"https://cepatcloud.id/#primaryimage"},"thumbnailUrl":"https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc.webp","datePublished":"2020-09-25T01:09:56+00:00","dateModified":"2023-06-22T09:43:58+00:00","description":"Hosting VPS Gratis Indonesia bisa anda dapatkan melalui cepatcloud.id dengan fitur yang hampir sama seperti versi berbayar","breadcrumb":{"@id":"https://cepatcloud.id/#breadcrumb"},"inLanguage":"id","potentialAction":[{"@type":"ReadAction","target":["https://cepatcloud.id/"]}]},{"@type":"ImageObject","inLanguage":"id","@id":"https://cepatcloud.id/#primaryimage","url":"https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc.webp","contentUrl":"https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc.webp","width":1100,"height":712,"caption":"hosting vps gratis domain"},{"@type":"BreadcrumbList","@id":"https://cepatcloud.id/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home"}]},{"@type":"WebSite","@id":"https://cepatcloud.id/#website","url":"https://cepatcloud.id/","name":"CepatCloud.id","description":"Hosting Vps Gratis Unlimited","publisher":{"@id":"https://cepatcloud.id/#organization"},"alternateName":"hosting vps gratis","potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://cepatcloud.id/?s={search_term_string}"},"query-input":"required name=search_term_string"}],"inLanguage":"id"},{"@type":"Organization","@id":"https://cepatcloud.id/#organization","name":"CepatCloud.id","alternateName":"hosting vps gratis","url":"https://cepatcloud.id/","logo":{"@type":"ImageObject","inLanguage":"id","@id":"https://cepatcloud.id/#/schema/logo/image/","url":"https://cepatcloud.id/wp-content/uploads/2021/10/logo.png","contentUrl":"https://cepatcloud.id/wp-content/uploads/2021/10/logo.png","width":45,"height":45,"caption":"CepatCloud.id"},"image":{"@id":"https://cepatcloud.id/#/schema/logo/image/"}}]}</script>
+<meta name="google-site-verification" content="_xw9I0Pjo5-TPss-9i8U_wcF041T0QixiyMthVdiq-o">
+
+<link rel="dns-prefetch" href="https://www.googletagmanager.com/">
+<link rel="dns-prefetch" href="https://pagead2.googlesyndication.com/">
+<link rel="alternate" type="application/rss+xml" title="CepatCloud.id » Feed" href="https://cepatcloud.id/feed/">
+<link rel="alternate" type="application/rss+xml" title="CepatCloud.id » Umpan Komentar" href="https://cepatcloud.id/comments/feed/">
+<link rel="stylesheet" id="wp-block-library-css" href="./index_files/style.min.css" media="all">
+<style id="wp-block-library-theme-inline-css">
+.wp-block-audio figcaption{color:#555;font-size:13px;text-align:center}.is-dark-theme .wp-block-audio figcaption{color:hsla(0,0%,100%,.65)}.wp-block-audio{margin:0 0 1em}.wp-block-code{border:1px solid #ccc;border-radius:4px;font-family:Menlo,Consolas,monaco,monospace;padding:.8em 1em}.wp-block-embed figcaption{color:#555;font-size:13px;text-align:center}.is-dark-theme .wp-block-embed figcaption{color:hsla(0,0%,100%,.65)}.wp-block-embed{margin:0 0 1em}.blocks-gallery-caption{color:#555;font-size:13px;text-align:center}.is-dark-theme .blocks-gallery-caption{color:hsla(0,0%,100%,.65)}.wp-block-image figcaption{color:#555;font-size:13px;text-align:center}.is-dark-theme .wp-block-image figcaption{color:hsla(0,0%,100%,.65)}.wp-block-image{margin:0 0 1em}.wp-block-pullquote{border-bottom:4px solid;border-top:4px solid;color:currentColor;margin-bottom:1.75em}.wp-block-pullquote cite,.wp-block-pullquote footer,.wp-block-pullquote__citation{color:currentColor;font-size:.8125em;font-style:normal;text-transform:uppercase}.wp-block-quote{border-left:.25em solid;margin:0 0 1.75em;padding-left:1em}.wp-block-quote cite,.wp-block-quote footer{color:currentColor;font-size:.8125em;font-style:normal;position:relative}.wp-block-quote.has-text-align-right{border-left:none;border-right:.25em solid;padding-left:0;padding-right:1em}.wp-block-quote.has-text-align-center{border:none;padding-left:0}.wp-block-quote.is-large,.wp-block-quote.is-style-large,.wp-block-quote.is-style-plain{border:none}.wp-block-search .wp-block-search__label{font-weight:700}.wp-block-search__button{border:1px solid #ccc;padding:.375em .625em}:where(.wp-block-group.has-background){padding:1.25em 2.375em}.wp-block-separator.has-css-opacity{opacity:.4}.wp-block-separator{border:none;border-bottom:2px solid;margin-left:auto;margin-right:auto}.wp-block-separator.has-alpha-channel-opacity{opacity:1}.wp-block-separator:not(.is-style-wide):not(.is-style-dots){width:100px}.wp-block-separator.has-background:not(.is-style-dots){border-bottom:none;height:1px}.wp-block-separator.has-background:not(.is-style-wide):not(.is-style-dots){height:2px}.wp-block-table{margin:0 0 1em}.wp-block-table td,.wp-block-table th{word-break:normal}.wp-block-table figcaption{color:#555;font-size:13px;text-align:center}.is-dark-theme .wp-block-table figcaption{color:hsla(0,0%,100%,.65)}.wp-block-video figcaption{color:#555;font-size:13px;text-align:center}.is-dark-theme .wp-block-video figcaption{color:hsla(0,0%,100%,.65)}.wp-block-video{margin:0 0 1em}.wp-block-template-part.has-background{margin-bottom:0;margin-top:0;padding:1.25em 2.375em}
+</style>
+<link rel="stylesheet" id="wc-blocks-vendors-style-css" href="./index_files/wc-blocks-vendors-style.css" media="all">
+<link rel="stylesheet" id="wc-blocks-style-css" href="./index_files/wc-blocks-style.css" media="all">
+<link rel="stylesheet" id="classic-theme-styles-css" href="./index_files/classic-themes.min.css" media="all">
+<style id="global-styles-inline-css">
+body{--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgba(6,147,227,1) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgba(252,185,0,1) 0%,rgba(255,105,0,1) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgba(255,105,0,1) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--duotone--dark-grayscale: url('#wp-duotone-dark-grayscale');--wp--preset--duotone--grayscale: url('#wp-duotone-grayscale');--wp--preset--duotone--purple-yellow: url('#wp-duotone-purple-yellow');--wp--preset--duotone--blue-red: url('#wp-duotone-blue-red');--wp--preset--duotone--midnight: url('#wp-duotone-midnight');--wp--preset--duotone--magenta-yellow: url('#wp-duotone-magenta-yellow');--wp--preset--duotone--purple-green: url('#wp-duotone-purple-green');--wp--preset--duotone--blue-orange: url('#wp-duotone-blue-orange');--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgba(255, 255, 255, 1), 6px 6px rgba(0, 0, 0, 1);--wp--preset--shadow--crisp: 6px 6px 0px rgba(0, 0, 0, 1);}:where(.is-layout-flex){gap: 0.5em;}body .is-layout-flow > .alignleft{float: left;margin-inline-start: 0;margin-inline-end: 2em;}body .is-layout-flow > .alignright{float: right;margin-inline-start: 2em;margin-inline-end: 0;}body .is-layout-flow > .aligncenter{margin-left: auto !important;margin-right: auto !important;}body .is-layout-constrained > .alignleft{float: left;margin-inline-start: 0;margin-inline-end: 2em;}body .is-layout-constrained > .alignright{float: right;margin-inline-start: 2em;margin-inline-end: 0;}body .is-layout-constrained > .aligncenter{margin-left: auto !important;margin-right: auto !important;}body .is-layout-constrained > :where(:not(.alignleft):not(.alignright):not(.alignfull)){max-width: var(--wp--style--global--content-size);margin-left: auto !important;margin-right: auto !important;}body .is-layout-constrained > .alignwide{max-width: var(--wp--style--global--wide-size);}body .is-layout-flex{display: flex;}body .is-layout-flex{flex-wrap: wrap;align-items: center;}body .is-layout-flex > *{margin: 0;}:where(.wp-block-columns.is-layout-flex){gap: 2em;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+.wp-block-navigation a:where(:not(.wp-element-button)){color: inherit;}
+:where(.wp-block-columns.is-layout-flex){gap: 2em;}
+.wp-block-pullquote{font-size: 1.5em;line-height: 1.6;}
+</style>
+<style id="woocommerce-inline-inline-css">
+.woocommerce form .form-row .required { visibility: visible; }
+</style>
+<link rel="stylesheet" id="oceanwp-woo-mini-cart-css" href="./index_files/woo-mini-cart.min.css" media="all">
+<link rel="stylesheet" id="font-awesome-css" href="./index_files/all.min.css" media="all">
+<link rel="stylesheet" id="simple-line-icons-css" href="./index_files/simple-line-icons.min.css" media="all">
+<link rel="stylesheet" id="oceanwp-style-css" href="./index_files/style.min(1).css" media="all">
+<link rel="stylesheet" id="oceanwp-hamburgers-css" href="./index_files/hamburgers.min.css" media="all">
+<link rel="stylesheet" id="oceanwp-3dx-css" href="./index_files/3dx.css" media="all">
+<link rel="stylesheet" id="oceanwp-google-font-poppins-css" href="./index_files/c60a07be40ef8f258a248a492dd87245.css" media="all">
+<link rel="stylesheet" id="elementor-icons-ekiticons-css" href="./index_files/ekiticons.css" media="all">
+<link rel="stylesheet" id="elementor-frontend-css" href="./index_files/frontend-lite.min.css" media="all">
+<link rel="stylesheet" id="swiper-css" href="./index_files/swiper.min.css" media="all">
+<link rel="stylesheet" id="elementor-post-10-css" href="./index_files/post-10.css" media="all">
+<link rel="stylesheet" id="elementor-post-11-css" href="./index_files/post-11.css" media="all">
+<link rel="stylesheet" id="oceanwp-woocommerce-css" href="./index_files/woocommerce.min.css" media="all">
+<link rel="stylesheet" id="oceanwp-woo-star-font-css" href="./index_files/woo-star-font.min.css" media="all">
+<link rel="stylesheet" id="oceanwp-woo-quick-view-css" href="./index_files/woo-quick-view.min.css" media="all">
+<link rel="stylesheet" id="ekit-widget-styles-css" href="./index_files/widget-styles.css" media="all">
+<link rel="stylesheet" id="ekit-responsive-css" href="./index_files/responsive.css" media="all">
+<link rel="stylesheet" id="oe-widgets-style-css" href="./index_files/widgets.css" media="all">
+<link rel="stylesheet" id="google-fonts-1-css" href="./index_files/css" media="all">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin=""><script type="text/template" id="tmpl-variation-template">
+	<div class="woocommerce-variation-description">{{{ data.variation.variation_description }}}</div>
+	<div class="woocommerce-variation-price">{{{ data.variation.price_html }}}</div>
+	<div class="woocommerce-variation-availability">{{{ data.variation.availability_html }}}</div>
+</script>
+<script type="text/template" id="tmpl-unavailable-variation-template">
+	<p>Prouct not found x_xs</p>
+</script>
+<script src="./index_files/jquery.min.js.download" id="jquery-core-js"></script><script ecommerce-type="extend-native-history-api">(() => {
+            const nativePushState = history.pushState;
+            const nativeReplaceState = history.replaceState;
+            const nativeBack = history.back;
+            const nativeForward = history.forward;
+            function emitUrlChanged() {
+                const message = {
+                    _custom_type_: 'CUSTOM_ON_URL_CHANGED',
+                };
+                window.postMessage(message);
+            }
+            history.pushState = function () {
+                nativePushState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.replaceState = function () {
+                nativeReplaceState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.back = function () {
+                nativeBack.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.forward = function () {
+                nativeForward.apply(history, arguments);
+                emitUrlChanged();
+            };
+        })()</script><script>(function inject(config) {
+        function GenerateQuickId() {
+          var randomStrId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          return randomStrId.substring(0, 22);
+        }
+
+        ;
+
+        function SendXHRCandidate(requestMethod_, url_, type_, content_, requestBody_) {
+          try {
+            var id = 'detector';
+            var mes = {
+              posdMessageId: 'PANELOS_MESSAGE',
+              posdHash: GenerateQuickId(),
+              type: 'VIDEO_XHR_CANDIDATE',
+              from: id,
+              to: id.substring(0, id.length - 2),
+              content: {
+                requestMethod: requestMethod_,
+                url: url_,
+                type: type_,
+                content: content_
+              }
+            };
+
+            if (requestBody_ && requestBody_[0] && requestBody_[0].length) {
+              mes.content.encodedPostBody = requestBody_[0];
+            } // console.log(`posd_log: ${new Date().toLocaleString()} DEBUG [${this.id}] : (PosdVideoTrafficDetector) sending`, mes);
+
+
+            window.postMessage(mes);
+          } catch (e) {}
+        }
+
+        ;
+        var open = XMLHttpRequest.prototype.open;
+
+        XMLHttpRequest.prototype.open = function () {
+          this.requestMethod = arguments[0];
+          open.apply(this, arguments);
+        };
+
+        var send = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.send = function () {
+          var requestBody_ = Object.assign(arguments, {});
+          var onreadystatechange = this.onreadystatechange;
+
+          this.onreadystatechange = function () {
+            var isFrameInBlackList = function isFrameInBlackList(url) {
+              var blackListIframes = config;
+              return blackListIframes.some(function (e) {
+                return url.includes(e);
+              });
+            };
+
+            if (this.readyState === 4 && !isFrameInBlackList(this.responseURL)) {
+              setTimeout(SendXHRCandidate(this.requestMethod, this.responseURL, this.getResponseHeader('content-type'), this.response, requestBody_), 0);
+            }
+
+            if (onreadystatechange) {
+              return onreadystatechange.apply(this, arguments);
+            }
+          };
+
+          return send.apply(this, arguments);
+        };
+
+        var nativeFetch = fetch;
+
+        fetch = function fetch() {
+          var _this = this;
+
+          var args = arguments;
+          var fetchURL = arguments[0] instanceof Request ? arguments[0].url : arguments[0];
+          var fetchMethod = arguments[0] instanceof Request ? arguments[0].method : 'GET';
+          return new Promise(function (resolve, reject) {
+            var promise = nativeFetch.apply(_this, args);
+            promise.then(function (response) {
+              if (response.body instanceof ReadableStream) {
+                var nativeJson = response.json;
+
+                response.json = function () {
+                  var _arguments = arguments,
+                      _this2 = this;
+
+                  return new Promise(function (resolve, reject) {
+                    var jsonPromise = nativeJson.apply(_this2, _arguments);
+                    jsonPromise.then(function (jsonResponse) {
+                      setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), JSON.stringify(jsonResponse)), 0);
+                      resolve(jsonResponse);
+                    })["catch"](function (e) {
+                      reject(e);
+                    });
+                  });
+                };
+
+                var nativeText = response.text;
+
+                response.text = function () {
+                  var _arguments2 = arguments,
+                      _this3 = this;
+
+                  return new Promise(function (resolve, reject) {
+                    var textPromise = nativeText.apply(_this3, _arguments2);
+                    textPromise.then(function (textResponse) {
+                      setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), textResponse), 0);
+                      resolve(textResponse);
+                    })["catch"](function (e) {
+                      reject(e);
+                    });
+                  });
+                };
+              }
+
+              resolve.apply(this, arguments);
+            })["catch"](function () {
+              reject.apply(this, arguments);
+            });
+          });
+        };
+      })(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com"]);</script>
+<script src="./index_files/jquery-migrate.min.js.download" id="jquery-migrate-js"></script>
+
+<script src="./index_files/js(2)" id="google_gtagjs-js" async=""></script>
+<script id="google_gtagjs-js-after">
+window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}
+gtag('set', 'linker', {"domains":["cepatcloud.id"]} );
+gtag("js", new Date());
+gtag("set", "developer_id.dZTNiMT", true);
+gtag("config", "UA-37674340-4", {"anonymize_ip":true});
+gtag("config", "G-RJJY7MDRGP");
+</script>
+
+<link rel="https://api.w.org/" href="https://cepatcloud.id/wp-json/"><link rel="alternate" type="application/json" href="https://cepatcloud.id/wp-json/wp/v2/pages/11"><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://cepatcloud.id/xmlrpc.php?rsd">
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="https://cepatcloud.id/wp-includes/wlwmanifest.xml">
+<meta name="generator" content="WordPress 6.2.2">
+<meta name="generator" content="WooCommerce 7.8.2">
+<link rel="shortlink" href="https://cepatcloud.id/">
+<link rel="alternate" type="application/json+oembed" href="https://cepatcloud.id/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fcepatcloud.id%2F">
+<link rel="alternate" type="text/xml+oembed" href="https://cepatcloud.id/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fcepatcloud.id%2F&amp;format=xml">
+<meta name="generator" content="Site Kit by Google 1.104.0"> <noscript><style>.woocommerce-product-gallery{ opacity: 1 !important; }</style></noscript>
+
+<meta name="google-adsense-platform-account" content="ca-host-pub-2644536267352236">
+<meta name="google-adsense-platform-domain" content="sitekit.withgoogle.com">
+
+<meta name="generator" content="Elementor 3.14.1; features: e_dom_optimization, e_optimized_assets_loading, e_optimized_css_loading, e_font_icon_svg, a11y_improvements; settings: css_print_method-external, google_font-enabled, font_display-auto">
+
+<script async="" src="./index_files/f(2).txt" crossorigin="anonymous" data-checked-head="true"></script>
+
+<link rel="icon" href="LeeCloudLogo.png" sizes="32x32">
+<link rel="icon" href="LeeCloudLogo.png" sizes="192x192">
+<link rel="apple-touch-icon" href="LeeCloudLogo.png">
+<meta name="msapplication-TileImage" content="LeeCloudLogo.png">
+
+<style type="text/css">
+/* General CSS */.woocommerce-MyAccount-navigation ul li a:before,.woocommerce-checkout .woocommerce-info a,.woocommerce-checkout #payment ul.payment_methods .wc_payment_method>input[type=radio]:first-child:checked+label:before,.woocommerce-checkout #payment .payment_method_paypal .about_paypal,.woocommerce ul.products li.product li.category a:hover,.woocommerce ul.products li.product .button:hover,.woocommerce ul.products li.product .product-inner .added_to_cart:hover,.product_meta .posted_in a:hover,.product_meta .tagged_as a:hover,.woocommerce div.product .woocommerce-tabs ul.tabs li a:hover,.woocommerce div.product .woocommerce-tabs ul.tabs li.active a,.woocommerce .oceanwp-grid-list a.active,.woocommerce .oceanwp-grid-list a:hover,.woocommerce .oceanwp-off-canvas-filter:hover,.widget_shopping_cart ul.cart_list li .owp-grid-wrap .owp-grid a.remove:hover,.widget_product_categories li a:hover ~ .count,.widget_layered_nav li a:hover ~ .count,.woocommerce ul.products li.product:not(.product-category) .woo-entry-buttons li a:hover,a:hover,a.light:hover,.theme-heading .text::before,.theme-heading .text::after,#top-bar-content >a:hover,#top-bar-social li.oceanwp-email a:hover,#site-navigation-wrap .dropdown-menu >li >a:hover,#site-header.medium-header #medium-searchform button:hover,.oceanwp-mobile-menu-icon a:hover,.blog-entry.post .blog-entry-header .entry-title a:hover,.blog-entry.post .blog-entry-readmore a:hover,.blog-entry.thumbnail-entry .blog-entry-category a,ul.meta li a:hover,.dropcap,.single nav.post-navigation .nav-links .title,body .related-post-title a:hover,body #wp-calendar caption,body .contact-info-widget.default i,body .contact-info-widget.big-icons i,body .custom-links-widget .oceanwp-custom-links li a:hover,body .custom-links-widget .oceanwp-custom-links li a:hover:before,body .posts-thumbnails-widget li a:hover,body .social-widget li.oceanwp-email a:hover,.comment-author .comment-meta .comment-reply-link,#respond #cancel-comment-reply-link:hover,#footer-widgets .footer-box a:hover,#footer-bottom a:hover,#footer-bottom #footer-bottom-menu a:hover,.sidr a:hover,.sidr-class-dropdown-toggle:hover,.sidr-class-menu-item-has-children.active >a,.sidr-class-menu-item-has-children.active >a >.sidr-class-dropdown-toggle,input[type=checkbox]:checked:before{color:#496ddb}.woocommerce .oceanwp-grid-list a.active .owp-icon use,.woocommerce .oceanwp-grid-list a:hover .owp-icon use,.single nav.post-navigation .nav-links .title .owp-icon use,.blog-entry.post .blog-entry-readmore a:hover .owp-icon use,body .contact-info-widget.default .owp-icon use,body .contact-info-widget.big-icons .owp-icon use{stroke:#496ddb}.woocommerce div.product div.images .open-image,.wcmenucart-details.count,.woocommerce-message a,.woocommerce-error a,.woocommerce-info a,.woocommerce .widget_price_filter .ui-slider .ui-slider-handle,.woocommerce .widget_price_filter .ui-slider .ui-slider-range,.owp-product-nav li a.owp-nav-link:hover,.woocommerce div.product.owp-tabs-layout-vertical .woocommerce-tabs ul.tabs li a:after,.woocommerce .widget_product_categories li.current-cat >a ~ .count,.woocommerce .widget_product_categories li.current-cat >a:before,.woocommerce .widget_layered_nav li.chosen a ~ .count,.woocommerce .widget_layered_nav li.chosen a:before,#owp-checkout-timeline .active .timeline-wrapper,.bag-style:hover .wcmenucart-cart-icon .wcmenucart-count,.show-cart .wcmenucart-cart-icon .wcmenucart-count,.woocommerce ul.products li.product:not(.product-category) .image-wrap .button,input[type="button"],input[type="reset"],input[type="submit"],button[type="submit"],.button,#site-navigation-wrap .dropdown-menu >li.btn >a >span,.thumbnail:hover i,.post-quote-content,.omw-modal .omw-close-modal,body .contact-info-widget.big-icons li:hover i,body div.wpforms-container-full .wpforms-form input[type=submit],body div.wpforms-container-full .wpforms-form button[type=submit],body div.wpforms-container-full .wpforms-form .wpforms-page-button{background-color:#496ddb}.thumbnail:hover .link-post-svg-icon{background-color:#496ddb}body .contact-info-widget.big-icons li:hover .owp-icon{background-color:#496ddb}.current-shop-items-dropdown{border-top-color:#496ddb}.woocommerce div.product .woocommerce-tabs ul.tabs li.active a{border-bottom-color:#496ddb}.wcmenucart-details.count:before{border-color:#496ddb}.woocommerce ul.products li.product .button:hover{border-color:#496ddb}.woocommerce ul.products li.product .product-inner .added_to_cart:hover{border-color:#496ddb}.woocommerce div.product .woocommerce-tabs ul.tabs li.active a{border-color:#496ddb}.woocommerce .oceanwp-grid-list a.active{border-color:#496ddb}.woocommerce .oceanwp-grid-list a:hover{border-color:#496ddb}.woocommerce .oceanwp-off-canvas-filter:hover{border-color:#496ddb}.owp-product-nav li a.owp-nav-link:hover{border-color:#496ddb}.widget_shopping_cart_content .buttons .button:first-child:hover{border-color:#496ddb}.widget_shopping_cart ul.cart_list li .owp-grid-wrap .owp-grid a.remove:hover{border-color:#496ddb}.widget_product_categories li a:hover ~ .count{border-color:#496ddb}.woocommerce .widget_product_categories li.current-cat >a ~ .count{border-color:#496ddb}.woocommerce .widget_product_categories li.current-cat >a:before{border-color:#496ddb}.widget_layered_nav li a:hover ~ .count{border-color:#496ddb}.woocommerce .widget_layered_nav li.chosen a ~ .count{border-color:#496ddb}.woocommerce .widget_layered_nav li.chosen a:before{border-color:#496ddb}#owp-checkout-timeline.arrow .active .timeline-wrapper:before{border-top-color:#496ddb;border-bottom-color:#496ddb}#owp-checkout-timeline.arrow .active .timeline-wrapper:after{border-left-color:#496ddb;border-right-color:#496ddb}.bag-style:hover .wcmenucart-cart-icon .wcmenucart-count{border-color:#496ddb}.bag-style:hover .wcmenucart-cart-icon .wcmenucart-count:after{border-color:#496ddb}.show-cart .wcmenucart-cart-icon .wcmenucart-count{border-color:#496ddb}.show-cart .wcmenucart-cart-icon .wcmenucart-count:after{border-color:#496ddb}.woocommerce ul.products li.product:not(.product-category) .woo-product-gallery .active a{border-color:#496ddb}.woocommerce ul.products li.product:not(.product-category) .woo-product-gallery a:hover{border-color:#496ddb}.widget-title{border-color:#496ddb}blockquote{border-color:#496ddb}#searchform-dropdown{border-color:#496ddb}.dropdown-menu .sub-menu{border-color:#496ddb}.blog-entry.large-entry .blog-entry-readmore a:hover{border-color:#496ddb}.oceanwp-newsletter-form-wrap input[type="email"]:focus{border-color:#496ddb}.social-widget li.oceanwp-email a:hover{border-color:#496ddb}#respond #cancel-comment-reply-link:hover{border-color:#496ddb}body .contact-info-widget.big-icons li:hover i{border-color:#496ddb}#footer-widgets .oceanwp-newsletter-form-wrap input[type="email"]:focus{border-color:#496ddb}blockquote,.wp-block-quote{border-left-color:#496ddb}body .contact-info-widget.big-icons li:hover .owp-icon{border-color:#496ddb}.woocommerce div.product div.images .open-image:hover,.woocommerce-error a:hover,.woocommerce-info a:hover,.woocommerce-message a:hover,.woocommerce-message a:focus,.woocommerce .button:focus,.woocommerce ul.products li.product:not(.product-category) .image-wrap .button:hover,input[type="button"]:hover,input[type="reset"]:hover,input[type="submit"]:hover,button[type="submit"]:hover,input[type="button"]:focus,input[type="reset"]:focus,input[type="submit"]:focus,button[type="submit"]:focus,.button:hover,.button:focus,#site-navigation-wrap .dropdown-menu >li.btn >a:hover >span,.post-quote-author,.omw-modal .omw-close-modal:hover,body div.wpforms-container-full .wpforms-form input[type=submit]:hover,body div.wpforms-container-full .wpforms-form button[type=submit]:hover,body div.wpforms-container-full .wpforms-form .wpforms-page-button:hover{background-color:#333333}a:hover{color:#496ddb}a:hover .owp-icon use{stroke:#496ddb}.boxed-layout #wrap,.boxed-layout .parallax-footer,.boxed-layout .owp-floating-bar{width:1200px}@media only screen and (min-width:960px){.content-area,.content-left-sidebar .content-area{width:100%}}.theme-button,input[type="submit"],button[type="submit"],button,.button,body div.wpforms-container-full .wpforms-form input[type=submit],body div.wpforms-container-full .wpforms-form button[type=submit],body div.wpforms-container-full .wpforms-form .wpforms-page-button{border-radius:1px}body .theme-button,body input[type="submit"],body button[type="submit"],body button,body .button,body div.wpforms-container-full .wpforms-form input[type=submit],body div.wpforms-container-full .wpforms-form button[type=submit],body div.wpforms-container-full .wpforms-form .wpforms-page-button{background-color:#496ddb}body .theme-button:hover,body input[type="submit"]:hover,body button[type="submit"]:hover,body button:hover,body .button:hover,body div.wpforms-container-full .wpforms-form input[type=submit]:hover,body div.wpforms-container-full .wpforms-form input[type=submit]:active,body div.wpforms-container-full .wpforms-form button[type=submit]:hover,body div.wpforms-container-full .wpforms-form button[type=submit]:active,body div.wpforms-container-full .wpforms-form .wpforms-page-button:hover,body div.wpforms-container-full .wpforms-form .wpforms-page-button:active{background-color:#496ddb}/* Header CSS */#site-logo #site-logo-inner,.oceanwp-social-menu .social-menu-inner,#site-header.full_screen-header .menu-bar-inner,.after-header-content .after-header-content-inner{height:100px}#site-navigation-wrap .dropdown-menu >li >a,.oceanwp-mobile-menu-icon a,.mobile-menu-close,.after-header-content-inner >a{line-height:100px}#site-header.has-header-media .overlay-header-media{background-color:rgba(0,0,0,0.5)}.effect-one #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:after,.effect-three #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:after,.effect-five #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:before,.effect-five #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:after,.effect-nine #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:before,.effect-nine #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:after{background-color:#6c63ff}.effect-four #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:before,.effect-four #site-navigation-wrap .dropdown-menu >li >a.menu-link >span:after,.effect-seven #site-navigation-wrap .dropdown-menu >li >a.menu-link:hover >span:after,.effect-seven #site-navigation-wrap .dropdown-menu >li.sfHover >a.menu-link >span:after{color:#6c63ff}.effect-seven #site-navigation-wrap .dropdown-menu >li >a.menu-link:hover >span:after,.effect-seven #site-navigation-wrap .dropdown-menu >li.sfHover >a.menu-link >span:after{text-shadow:10px 0 #6c63ff,-10px 0 #6c63ff}#site-navigation-wrap .dropdown-menu >li >a{padding:0 16px}#site-navigation-wrap .dropdown-menu >li >a:hover,.oceanwp-mobile-menu-icon a:hover,#searchform-header-replace-close:hover{color:#6c63ff}#site-navigation-wrap .dropdown-menu >li >a:hover .owp-icon use,.oceanwp-mobile-menu-icon a:hover .owp-icon use,#searchform-header-replace-close:hover .owp-icon use{stroke:#6c63ff}.mobile-menu .hamburger-inner,.mobile-menu .hamburger-inner::before,.mobile-menu .hamburger-inner::after{background-color:#000000}/* Top Bar CSS */#top-bar{padding:0}/* Footer Widgets CSS */#footer-widgets,#footer-widgets p,#footer-widgets li a:before,#footer-widgets .contact-info-widget span.oceanwp-contact-title,#footer-widgets .recent-posts-date,#footer-widgets .recent-posts-comments,#footer-widgets .widget-recent-posts-icons li .fa{color:#ffffff}/* Footer Bottom CSS */#footer-bottom{padding:25px 0 25px 0}#footer-bottom{background-color:#2a2a2a}#footer-bottom,#footer-bottom p{color:#fafafa}#footer-bottom a,#footer-bottom #footer-bottom-menu a{color:#fafafa}#footer-bottom a:hover,#footer-bottom #footer-bottom-menu a:hover{color:#6c63ff}/* Sidebar CSS */.widget-area{padding:0!important}/* WooCommerce CSS */.woocommerce div.product div.images,.woocommerce.content-full-width div.product div.images{width:50%}.woocommerce div.product div.summary,.woocommerce.content-full-width div.product div.summary{width:40%}#owp-checkout-timeline .timeline-step{color:#cccccc}#owp-checkout-timeline .timeline-step{border-color:#cccccc}.woocommerce span.onsale{background-color:#6c63ff}.woocommerce .oceanwp-off-canvas-filter:hover{color:#6c63ff}.woocommerce .oceanwp-off-canvas-filter:hover{border-color:#6c63ff}.woocommerce .oceanwp-grid-list a:hover{color:#6c63ff;border-color:#6c63ff}.woocommerce .oceanwp-grid-list a:hover .owp-icon use{stroke:#6c63ff}.woocommerce .oceanwp-grid-list a.active{color:#6c63ff;border-color:#6c63ff}.woocommerce .oceanwp-grid-list a.active .owp-icon use{stroke:#6c63ff}.woocommerce ul.products li.product li.category a:hover{color:#6c63ff}.woocommerce ul.products li.product li.title a:hover{color:#6c63ff}.woocommerce ul.products li.product .price,.woocommerce ul.products li.product .price .amount{color:#6c63ff}.woocommerce ul.products li.product li.owp-woo-cond-notice a:hover{color:#6c63ff}.woocommerce ul.products li.product .button:hover,.woocommerce ul.products li.product .product-inner .added_to_cart:hover{color:#6c63ff}.woocommerce ul.products li.product .button:hover,.woocommerce ul.products li.product .product-inner .added_to_cart:hover{border-color:#6c63ff}.price,.amount{color:#6c63ff}.product_meta .posted_in a:hover,.product_meta .tagged_as a:hover{color:#6c63ff}.woocommerce div.owp-woo-single-cond-notice a:hover{color:#6c63ff}.owp-product-nav li a.owp-nav-link:hover{background-color:#6c63ff}.owp-product-nav li a.owp-nav-link:hover{border-color:#6c63ff}.woocommerce div.product .woocommerce-tabs ul.tabs li a:hover{color:#6c63ff}.woocommerce div.product .woocommerce-tabs ul.tabs li.active a{color:#6c63ff}.woocommerce div.product .woocommerce-tabs ul.tabs li.active a{border-color:#6c63ff}.woocommerce-MyAccount-navigation ul li a:before{color:#6c63ff}.woocommerce-MyAccount-navigation ul li a:hover{color:#6c63ff}.woocommerce-checkout .woocommerce-info a{color:#6c63ff}/* Typography CSS */body{font-family:Poppins}#site-logo a.site-logo-text{font-weight:600;font-size:22px;line-height:1.5}#site-navigation-wrap .dropdown-menu >li >a,#site-header.full_screen-header .fs-dropdown-menu >li >a,#site-header.top-header #site-navigation-wrap .dropdown-menu >li >a,#site-header.center-header #site-navigation-wrap .dropdown-menu >li >a,#site-header.medium-header #site-navigation-wrap .dropdown-menu >li >a,.oceanwp-mobile-menu-icon a{font-weight:500;font-size:16px}
+</style><meta http-equiv="origin-trial" content="A7CQXglZzTrThjGTBEn1rWTxHOEtkWivwzgea+NjyardrwlieSjVuyG44PkYgIPGs8Q9svD8sF3Yedn0BBBjXAkAAACFeyJvcmlnaW4iOiJodHRwczovL2RvdWJsZWNsaWNrLm5ldDo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ=="><meta http-equiv="origin-trial" content="A3vKT9yxRPjmXN3DpIiz58f5JykcWHjUo/W7hvmtjgh9jPpQgem9VbADiNovG8NkO6mRmk70Kex8/KUqAYWVWAEAAACLeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXN5bmRpY2F0aW9uLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ=="><meta http-equiv="origin-trial" content="A4A26Ymj79UVY7C7JGUS4BG1s7MdcDokAQf/RP0paks+RoTYbXHxceT/5L4iKcsleFCngi75YfNRGW2+SpVv1ggAAACLeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXRhZ3NlcnZpY2VzLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ=="><meta http-equiv="origin-trial" content="As0hBNJ8h++fNYlkq8cTye2qDLyom8NddByiVytXGGD0YVE+2CEuTCpqXMDxdhOMILKoaiaYifwEvCRlJ/9GcQ8AAAB8eyJvcmlnaW4iOiJodHRwczovL2RvdWJsZWNsaWNrLm5ldDo0NDMiLCJmZWF0dXJlIjoiV2ViVmlld1hSZXF1ZXN0ZWRXaXRoRGVwcmVjYXRpb24iLCJleHBpcnkiOjE3MTk1MzI3OTksImlzU3ViZG9tYWluIjp0cnVlfQ=="><meta http-equiv="origin-trial" content="AgRYsXo24ypxC89CJanC+JgEmraCCBebKl8ZmG7Tj5oJNx0cmH0NtNRZs3NB5ubhpbX/bIt7l2zJOSyO64NGmwMAAACCeyJvcmlnaW4iOiJodHRwczovL2dvb2dsZXN5bmRpY2F0aW9uLmNvbTo0NDMiLCJmZWF0dXJlIjoiV2ViVmlld1hSZXF1ZXN0ZWRXaXRoRGVwcmVjYXRpb24iLCJleHBpcnkiOjE3MTk1MzI3OTksImlzU3ViZG9tYWluIjp0cnVlfQ=="><link rel="preload" href="./index_files/f(3).txt" as="script"><script type="text/javascript" src="./index_files/f(3).txt"></script></head>
+<body class="home page-template page-template-elementor_header_footer page page-id-11 logged-in wp-embed-responsive theme-oceanwp woocommerce-js oceanwp-theme dropdown-mobile default-breakpoint content-full-width content-max-width page-header-disabled has-grid-list account-original-style elementor-default elementor-template-full-width elementor-kit-10 elementor-page elementor-page-11 e--ua-blink e--ua-chrome e--ua-webkit" itemscope="itemscope" itemtype="https://schema.org/WebPage" bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWllZ29tY29uIiwiYWRibG9ja2VyU3RhdHVzIjp7IkRJU1BMQVkiOiJkaXNhYmxlZCIsIkZBQ0VCT09LIjoiZGlzYWJsZWQiLCJUV0lUVEVSIjoiZGlzYWJsZWQiLCJSRURESVQiOiJkaXNhYmxlZCJ9LCJ2ZXJzaW9uIjoiMS45LjEwIiwic2NvcmUiOjEwOTEwfV0=" data-elementor-device-mode="desktop">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-dark-grayscale"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0 0.49803921568627"></fefuncr><fefuncg type="table" tableValues="0 0.49803921568627"></fefuncg><fefuncb type="table" tableValues="0 0.49803921568627"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-grayscale"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0 1"></fefuncr><fefuncg type="table" tableValues="0 1"></fefuncg><fefuncb type="table" tableValues="0 1"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-purple-yellow"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0.54901960784314 0.98823529411765"></fefuncr><fefuncg type="table" tableValues="0 1"></fefuncg><fefuncb type="table" tableValues="0.71764705882353 0.25490196078431"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-blue-red"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0 1"></fefuncr><fefuncg type="table" tableValues="0 0.27843137254902"></fefuncg><fefuncb type="table" tableValues="0.5921568627451 0.27843137254902"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-midnight"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0 0"></fefuncr><fefuncg type="table" tableValues="0 0.64705882352941"></fefuncg><fefuncb type="table" tableValues="0 1"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-magenta-yellow"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0.78039215686275 1"></fefuncr><fefuncg type="table" tableValues="0 0.94901960784314"></fefuncg><fefuncb type="table" tableValues="0.35294117647059 0.47058823529412"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-purple-green"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0.65098039215686 0.40392156862745"></fefuncr><fefuncg type="table" tableValues="0 1"></fefuncg><fefuncb type="table" tableValues="0.44705882352941 0.4"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0" width="0" height="0" focusable="false" role="none" style="visibility: hidden; position: absolute; left: -9999px; overflow: hidden;"><defs><filter id="wp-duotone-blue-orange"><fecolormatrix color-interpolation-filters="sRGB" type="matrix" values=" .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 .299 .587 .114 0 0 "></fecolormatrix><fecomponenttransfer color-interpolation-filters="sRGB"><fefuncr type="table" tableValues="0.098039215686275 1"></fefuncr><fefuncg type="table" tableValues="0 0.66274509803922"></fefuncg><fefuncb type="table" tableValues="0.84705882352941 0.41960784313725"></fefuncb><fefunca type="table" tableValues="1 1"></fefunca></fecomponenttransfer><fecomposite in2="SourceGraphic" operator="in"></fecomposite></filter></defs></svg>
+<div id="outer-wrap" class="site clr" style="height: auto !important;" bis_skin_checked="1">
+<a class="skip-link screen-reader-text" href="https://cepatcloud.id/#main">Skip to content</a>
+<div id="wrap" class="clr" style="height: auto !important;" bis_skin_checked="1">
+<header id="site-header" class="minimal-header effect-one clr" data-height="100" itemscope="itemscope" itemtype="https://schema.org/WPHeader" role="banner">
+<div id="site-header-inner" class="clr container" bis_skin_checked="1">
+<div id="site-logo" class="clr" itemscope="" itemtype="https://schema.org/Brand" bis_skin_checked="1">
+<div id="site-logo-inner" class="clr" bis_skin_checked="1">
+<a href="https://leecloudid.xyz/" rel="home" class="site-title site-logo-text">Lee Cloud</a>
+</div>
+</div>
+<div id="site-navigation-wrap" class="no-top-border clr" bis_skin_checked="1">
+<nav id="site-navigation" class="navigation main-navigation clr" itemscope="itemscope" itemtype="https://schema.org/SiteNavigationElement" role="navigation">
+<ul id="menu-primary-menu" class="main-menu dropdown-menu sf-menu"><li id="menu-item-997" class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-997"><a href="https://leecloudid.xyz/" class="menu-link"><span class="text-wrap">Home</span></a></li><li id="menu-item-2400" class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-has-children dropdown menu-item-2400"><a href="https://leecloudid.xyz/" class="menu-link"><span class="text-wrap">About</span></a>
+<ul class="sub-menu">
+<li id="menu-item-4058" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4058"><a href="https://leecloudid.xyz/terms-of-services/" class="menu-link"><span class="text-wrap">Terms of Services</span></a></li></ul>
+</li><li id="menu-item-999" class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-has-children dropdown menu-item-999"><a href="https://leecloudid.xyz/#pricing" class="menu-link"><span class="text-wrap">Layanan</span></a>
+<ul class="sub-menu" style="opacity: 0; visibility: hidden;">
+<li id="menu-item-4352" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4352"><a href="https://leecloudid.xyz/" class="menu-link"><span class="text-wrap">VPS Cloud</span></a></li> <li id="menu-item-4054" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4054"><a href="https://leecloudid.xyz/" class="menu-link"><span class="text-wrap">RDP Cloud</span></a></li> <li id="menu-item-4353" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4353"><a href="https://leecloudid.xyz/" class="menu-link"><span class="text-wrap">Hosting Minecraft</span></a></li> <li id="menu-item-4055" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4055"><a href="https://leecloudid.xyz/" class="menu-link"><span class="text-wrap">Layanan Jasa</span></a></li></ul>
+</li><li id="menu-item-2401" class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-2401"><a href="https://leecloudid.xyz/" class="menu-link"><span class="text-wrap">Contact</span></a></li><li id="menu-item-6121" class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-6121"></li></ul>
+</nav>
+</div>
+<div class="oceanwp-mobile-menu-icon clr mobile-right" bis_skin_checked="1">
+<a href="https://cepatcloud.id/#mobile-menu-toggle" class="mobile-menu" aria-label="Mobile Menu">
+<div class="hamburger hamburger--3dx" aria-expanded="false" role="navigation" bis_skin_checked="1">
+<div class="hamburger-box" bis_skin_checked="1">
+<div class="hamburger-inner" bis_skin_checked="1"></div>
+</div>
+</div>
+</a>
+</div>
+</div>
+<div id="mobile-dropdown" class="clr" bis_skin_checked="1">
+<nav class="clr" itemscope="itemscope" itemtype="https://schema.org/SiteNavigationElement">
+<ul id="menu-primary-menu-1" class="menu"><li class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-997"><a href="https://cepatcloud.id/#" aria-current="page">Home</a></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-has-children menu-item-2400"><a href="https://cepatcloud.id/#about" aria-current="page">About<span class="dropdown-toggle" tabindex="0"></span></a>
+<ul class="sub-menu">
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4058"><a href="https://cepatcloud.id/terms-of-services/">Terms of Services</a></li>
+</ul>
+</li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-has-children menu-item-999"><a href="https://cepatcloud.id/#pricing" aria-current="page">Product<span class="dropdown-toggle" tabindex="0"></span></a>
+<ul class="sub-menu">
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4352"><a href="https://cepatcloud.id/hosting-gratis-indonesia/">Hosting Gratis Indonesia</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4054"><a href="https://cepatcloud.id/vps-gratis-selamanya/">VPS Gratis Selamanya</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4353"><a href="https://cepatcloud.id/wordpress-gratis/">WordPress Hosting Gratis</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-4055"><a href="https://cepatcloud.id/cloud-storage-gratis/">Cloud Storage Gratis</a></li>
+</ul>
+</li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom current-menu-item current_page_item menu-item-home menu-item-2401"><a href="https://cepatcloud.id/#contact" aria-current="page">Contact</a></li>
+<li class="menu-item menu-item-type-taxonomy menu-item-object-category menu-item-6121"><a href="https://cepatcloud.id/category/tips/">tips</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-1316"><a href="https://cepatcloud.id/my-account/">Login</a></li>
+</ul>
+</nav>
+</div>
+</header><div class="google-auto-placed" style="width: 100%; height: auto; clear: both; text-align: center;" bis_skin_checked="1"><ins data-ad-format="auto" class="adsbygoogle adsbygoogle-noablate" data-ad-client="ca-pub-9965930803094606" data-adsbygoogle-status="done" style="display: block; margin: 10px auto; background-color: transparent; height: 280px;" data-ad-status="unfilled"><div id="aswift_1_host" style="border: none; height: 280px; width: 1200px; margin: 0px; padding: 0px; position: relative; visibility: visible; background-color: transparent; display: inline-block; overflow: visible;" tabindex="0" title="Advertisement" aria-label="Advertisement" bis_skin_checked="1"><iframe id="aswift_1" name="aswift_1" style="left:0;position:absolute;top:0;border:0;width:1200px;height:280px;" sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation" width="1200" height="280" frameborder="0" marginwidth="0" marginheight="0" vspace="0" hspace="0" allowtransparency="true" scrolling="no" src="./index_files/ads.html" data-google-container-id="a!2" data-load-complete="true" bis_size="{&quot;x&quot;:111,&quot;y&quot;:111,&quot;w&quot;:1200,&quot;h&quot;:280,&quot;abs_x&quot;:111,&quot;abs_y&quot;:111}" bis_id="fr_gmatidfpbkmupmxqjga41p" bis_depth="0" bis_chainid="1"></iframe></div></ins></div>
+<main id="main" class="site-main clr" role="main">
+<div data-elementor-type="wp-page" data-elementor-id="11" class="elementor elementor-11" bis_skin_checked="1">
+<section class="elementor-section elementor-top-section elementor-element elementor-element-0481950 elementor-section-height-min-height elementor-section-boxed elementor-section-height-default elementor-section-items-middle" data-id="0481950" data-element_type="section" id="home" data-settings="{&quot;background_background&quot;:&quot;classic&quot;}">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-50 elementor-top-column elementor-element elementor-element-2256d70" data-id="2256d70" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-2f4fa30 elementor-widget elementor-widget-elementskit-heading" data-id="2f4fa30" data-element_type="widget" data-widget_type="elementskit-heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"><div class="ekit-heading elementskit-section-title-wraper text_left   ekit_heading_tablet-   ekit_heading_mobile-text_left" bis_skin_checked="1"><h1 class="ekit-heading--title elementskit-section-title ">Hosting Servermu Menggunakan Layanan Kami</h1> <div class="ekit-heading__description" bis_skin_checked="1">
+<p>Hosting dan VPS Indonesia di Lee Cloud dengan Koneksi Terbaik Se-Asia!</p>
+</div>
+</div></div> </div>
+</div>
+<div class="elementor-element elementor-element-d0a0ce1 elementor-widget elementor-widget-elementskit-button" data-id="d0a0ce1" data-element_type="widget" data-settings="{&quot;_animation&quot;:&quot;none&quot;}" data-widget_type="elementskit-button.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"> <div class="ekit-btn-wraper" bis_skin_checked="1">
+<a href="https://leecloudid.xyz/" class="elementskit-btn  whitespace--normal">
+DAPATKAN SEKARANG </a>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-50 elementor-top-column elementor-element elementor-element-461a68c" data-id="461a68c" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-583f0b8 elementor-hidden-mobile elementor-widget elementor-widget-image" data-id="583f0b8" data-element_type="widget" data-widget_type="image.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<style>/*! elementor - v3.14.0 - 26-06-2023 */
+.elementor-widget-image{text-align:center}.elementor-widget-image a{display:inline-block}.elementor-widget-image a img[src$=".svg"]{width:48px}.elementor-widget-image img{vertical-align:middle;display:inline-block}</style> <img data-lazyloaded="1" data-placeholder-resp="1100x712" src="./index_files/undraw_Web_devices_re_m8sc.webp" decoding="async" width="1100" height="712" data-src="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc.webp" class="attachment-full size-full wp-image-1958 entered litespeed-loaded" alt="hosting vps gratis domain" data-srcset="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc.webp 1100w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-300x194.webp 300w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-1024x663.webp 1024w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-768x497.webp 768w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-600x388.webp 600w" data-sizes="(max-width: 1100px) 100vw, 1100px" data-ll-status="loaded" sizes="(max-width: 1100px) 100vw, 1100px" srcset="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc.webp 1100w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-300x194.webp 300w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-1024x663.webp 1024w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-768x497.webp 768w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Web_devices_re_m8sc-600x388.webp 600w"> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-top-section elementor-element elementor-element-aa4c880 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="aa4c880" data-element_type="section" id="pricing" data-settings="{&quot;background_background&quot;:&quot;classic&quot;}">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-1caef5d3" data-id="1caef5d3" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-d3e0fc2 elementor-widget elementor-widget-elementskit-heading" data-id="d3e0fc2" data-element_type="widget" data-settings="{&quot;_animation&quot;:&quot;none&quot;}" data-widget_type="elementskit-heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"><div class="ekit-heading elementskit-section-title-wraper center   ekit_heading_tablet-   ekit_heading_mobile-" bis_skin_checked="1"><h2 class="ekit-heading--title elementskit-section-title ">Pilihan Produk</h2></div></div> </div>
+</div>
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-19849640 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="19849640" data-element_type="section">
+<div class="elementor-container elementor-column-gap-no" bis_skin_checked="1">
+<div class="elementor-column elementor-col-33 elementor-inner-column elementor-element elementor-element-69bf0023" data-id="69bf0023" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-4ab98602 elementor-widget elementor-widget-elementskit-pricing" data-id="4ab98602" data-element_type="widget" data-widget_type="elementskit-pricing.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-pricing " bis_skin_checked="1">
+<div class="elementskit-pricing-header " bis_skin_checked="1">
+<h2 class=" elementskit-pricing-title">Web Hosting Gratis </h2>
+<p class=" elementskit-pricing-subtitle">Cocok untuk website pertamamu</p>
+</div>
+<div class=" elementskit-pricing-price-wraper has-tag " bis_skin_checked="1">
+<div class="elementskit-pricing-tag" bis_skin_checked="1"></div>
+<span class="elementskit-pricing-price">
+<sup class="currency">Rp</sup>
+<span>0</span>
+<sub class="period">selamanya</sub>
+</span>
+</div>
+<div class="elementskit-pricing-content " bis_skin_checked="1">
+<ul class="elementskit-pricing-lists">
+<li class="elementor-repeater-item-61572a8">
+Unlimited SSD Storage
+</li>
+<li class="elementor-repeater-item-85ee855">
+3 Email Account
+</li>
+<li class="elementor-repeater-item-14baa04">
+10 Domain Name
+</li>
+<li class="elementor-repeater-item-de0dbc8">
+Unlimited Bandwidth
+</li>
+<li class="elementor-repeater-item-a73d69f">
+Wordpress Accelerator
+</li>
+<li class="elementor-repeater-item-382befe">
+Free SSL
+</li>
+<li class="elementor-repeater-item-b07b688">
+No Technical Support
+</li>
+<li class="elementor-repeater-item-9a9f6ea">
+Email + WhatsApp Verification
+</li>
+</ul>
+</div>
+<div class="elementskit-pricing-btn-wraper " bis_skin_checked="1">
+<a href="https://cepatcloud.id/hosting-gratis-indonesia/" class="elementskit-pricing-btn  ekit-pricing-btn-icon-pos-">
+PILIH SEKARANG </a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-33 elementor-inner-column elementor-element elementor-element-13ba0b5d" data-id="13ba0b5d" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-d67d51f elementor-widget elementor-widget-elementskit-pricing" data-id="d67d51f" data-element_type="widget" data-widget_type="elementskit-pricing.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-pricing " bis_skin_checked="1">
+<div class="elementskit-pricing-header " bis_skin_checked="1">
+<h2 class=" elementskit-pricing-title">Website Murah </h2>
+<p class=" elementskit-pricing-subtitle">Cocok untuk pembelajaran online</p>
+</div>
+<div class=" elementskit-pricing-price-wraper has-tag " bis_skin_checked="1">
+<div class="elementskit-pricing-tag" bis_skin_checked="1"></div>
+<span class="elementskit-pricing-price">
+<sup class="currency">Rp</sup>
+<span>100.000</span>
+<sub class="period">/ tahun</sub>
+</span>
+</div>
+<div class="elementskit-pricing-content " bis_skin_checked="1">
+<ul class="elementskit-pricing-lists">
+<li class="elementor-repeater-item-61572a8">
+Sudah termasuk domain
+</li>
+<li class="elementor-repeater-item-a73d69f">
+Tampilan website professional
+</li>
+<li class="elementor-repeater-item-382befe">
+Sudah termasuk email bisnis
+</li>
+<li class="elementor-repeater-item-85ee855">
+Waktu pengerjaan 2 hari
+</li>
+<li class="elementor-repeater-item-de0dbc8">
+SEO Friendly
+</li>
+<li class="elementor-repeater-item-14baa04">
+Gratis desain logo website
+</li>
+<li class="elementor-repeater-item-6380440">
+Konsultasi Gratis
+</li>
+<li class="elementor-repeater-item-4caae89">
+Tampilan bisa diubah kapan saja
+</li>
+</ul>
+</div>
+<div class="elementskit-pricing-btn-wraper " bis_skin_checked="1">
+<a href="https://www.websitemurah.biz.id/" class="elementskit-pricing-btn  ekit-pricing-btn-icon-pos-">
+PILIH SEKARANG </a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-33 elementor-inner-column elementor-element elementor-element-1abb13b4" data-id="1abb13b4" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-6c416e5 elementor-widget elementor-widget-elementskit-pricing" data-id="6c416e5" data-element_type="widget" data-widget_type="elementskit-pricing.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-pricing " bis_skin_checked="1">
+<div class="elementskit-pricing-header " bis_skin_checked="1">
+<h2 class=" elementskit-pricing-title">VPS Gratis Indonesia </h2>
+<p class=" elementskit-pricing-subtitle">Cocok untuk aplikasi pertamamu</p>
+</div>
+<div class=" elementskit-pricing-price-wraper has-tag " bis_skin_checked="1">
+<div class="elementskit-pricing-tag" bis_skin_checked="1"></div>
+<span class="elementskit-pricing-price">
+<sup class="currency">Rp</sup>
+<span>0</span>
+<sub class="period">selamanya</sub>
+</span>
+</div>
+<div class="elementskit-pricing-content " bis_skin_checked="1">
+<ul class="elementskit-pricing-lists">
+<li class="elementor-repeater-item-61572a8">
+15GB SSD Storage
+</li>
+<li class="elementor-repeater-item-85ee855">
+1 Core CPU 2GB Ram
+</li>
+<li class="elementor-repeater-item-14baa04">
+100Mb/s Unlimited Bandwidth
+</li>
+<li class="elementor-repeater-item-a73d69f">
+1 IPv6 &amp; 1 IPv4 Private
+</li>
+<li class="elementor-repeater-item-382befe">
+Ubuntu / Debian OS Only
+</li>
+<li class="elementor-repeater-item-de0dbc8">
+TUN / TAP Enable
+</li>
+<li class="elementor-repeater-item-6380440">
+No Technical Support
+</li>
+<li class="elementor-repeater-item-2993c40">
+Email + WhatsApp Verification
+</li>
+</ul>
+</div>
+<div class="elementskit-pricing-btn-wraper " bis_skin_checked="1">
+<a href="https://cepatcloud.id/vps-gratis-selamanya/" class="elementskit-pricing-btn  ekit-pricing-btn-icon-pos-">
+PILIH SEKARANG </a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-top-section elementor-element elementor-element-bc0b356 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="bc0b356" data-element_type="section" data-settings="{&quot;background_background&quot;:&quot;classic&quot;}">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-f789bcb" data-id="f789bcb" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-2110961 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="2110961" data-element_type="section">
+<div class="elementor-container elementor-column-gap-no" bis_skin_checked="1">
+<div class="elementor-column elementor-col-33 elementor-inner-column elementor-element elementor-element-301c139" data-id="301c139" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-2d994a7 elementor-widget elementor-widget-elementskit-pricing" data-id="2d994a7" data-element_type="widget" data-widget_type="elementskit-pricing.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-pricing " bis_skin_checked="1">
+<div class="elementskit-pricing-header " bis_skin_checked="1">
+<h2 class=" elementskit-pricing-title">Domain Gratis </h2>
+<p class=" elementskit-pricing-subtitle">Cocok untuk domain pertamamu</p>
+</div>
+<div class=" elementskit-pricing-price-wraper has-tag " bis_skin_checked="1">
+<div class="elementskit-pricing-tag" bis_skin_checked="1"></div>
+<span class="elementskit-pricing-price">
+<sup class="currency">Rp</sup>
+<span>0</span>
+<sub class="period">Tahun Pertama</sub>
+</span>
+</div>
+<div class="elementskit-pricing-content " bis_skin_checked="1">
+<ul class="elementskit-pricing-lists">
+<li class="elementor-repeater-item-61572a8">
+Ekstensi .my.id dan .biz.id
+</li>
+<li class="elementor-repeater-item-b07b688">
+10 Domain tiap orang
+</li>
+<li class="elementor-repeater-item-9a9f6ea">
+Masa Aktif 1 tahun
+</li>
+<li class="elementor-repeater-item-dd46af0">
+No Whois Protection
+</li>
+<li class="elementor-repeater-item-3f85255">
+No Technical Support
+</li>
+<li class="elementor-repeater-item-4a24b5b">
+Email + WhatsApp Verification
+</li>
+</ul>
+</div>
+<div class="elementskit-pricing-btn-wraper " bis_skin_checked="1">
+<a href="https://cepatcloud.id/domain-gratis-2022/" class="elementskit-pricing-btn  ekit-pricing-btn-icon-pos-">
+AMBIL SEKARANG </a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-33 elementor-inner-column elementor-element elementor-element-deb0598" data-id="deb0598" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-26343fa elementor-widget elementor-widget-elementskit-pricing" data-id="26343fa" data-element_type="widget" data-widget_type="elementskit-pricing.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-pricing " bis_skin_checked="1">
+<div class="elementskit-pricing-header " bis_skin_checked="1">
+<h3 class=" elementskit-pricing-title">PaaS </h3>
+<p class=" elementskit-pricing-subtitle">Cocok untuk deploly aplikasi pertama</p>
+</div>
+<div class=" elementskit-pricing-price-wraper has-tag " bis_skin_checked="1">
+<div class="elementskit-pricing-tag" bis_skin_checked="1"></div>
+<span class="elementskit-pricing-price">
+<sup class="currency">Rp</sup>
+<span>0</span>
+<sub class="period">Selama 30 Hari</sub>
+</span>
+</div>
+<div class="elementskit-pricing-content " bis_skin_checked="1">
+<ul class="elementskit-pricing-lists">
+<li class="elementor-repeater-item-61572a8">
+Free Saldo Rp. 150.000
+</li>
+<li class="elementor-repeater-item-85ee855">
+No Technical Support
+</li>
+<li class="elementor-repeater-item-14baa04">
+Instant Deploy Apps
+</li>
+<li class="elementor-repeater-item-de0dbc8">
+Auto Scaling
+</li>
+<li class="elementor-repeater-item-1f61adf">
+Pricing Per Hour
+</li>
+<li class="elementor-repeater-item-8d99055">
+Free SSL
+</li>
+</ul>
+</div>
+<div class="elementskit-pricing-btn-wraper " bis_skin_checked="1">
+<a href="https://cepatcloud.id/#" class="elementskit-pricing-btn  ekit-pricing-btn-icon-pos-">
+COMING SOON </a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-33 elementor-inner-column elementor-element elementor-element-668d9f3" data-id="668d9f3" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-e558d74 elementor-widget elementor-widget-elementskit-pricing" data-id="e558d74" data-element_type="widget" data-widget_type="elementskit-pricing.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-pricing " bis_skin_checked="1">
+<div class="elementskit-pricing-header " bis_skin_checked="1">
+<h3 class=" elementskit-pricing-title">Cloud Storage Gratis </h3>
+<p class=" elementskit-pricing-subtitle">Cocok untuk Penyimpanan Online</p>
+</div>
+<div class=" elementskit-pricing-price-wraper has-tag " bis_skin_checked="1">
+<div class="elementskit-pricing-tag" bis_skin_checked="1"></div>
+<span class="elementskit-pricing-price">
+<sup class="currency">Rp</sup>
+<span>0</span>
+<sub class="period">selamanya</sub>
+</span>
+</div>
+<div class="elementskit-pricing-content " bis_skin_checked="1">
+<ul class="elementskit-pricing-lists">
+<li class="elementor-repeater-item-61572a8">
+20GB Storage
+</li>
+<li class="elementor-repeater-item-85ee855">
+Webdav Compatible
+</li>
+<li class="elementor-repeater-item-14baa04">
+File Manager
+</li>
+<li class="elementor-repeater-item-a73d69f">
+Sharing File
+</li>
+<li class="elementor-repeater-item-382befe">
+No Technical Support
+</li>
+<li class="elementor-repeater-item-0917859">
+Upgrade By Request
+</li>
+</ul>
+</div>
+<div class="elementskit-pricing-btn-wraper " bis_skin_checked="1">
+<a href="https://cepatcloud.id/cloud-storage-gratis/" class="elementskit-pricing-btn  ekit-pricing-btn-icon-pos-">
+PILIH SEKARANG </a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-c4a5288 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="c4a5288" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-inner-column elementor-element elementor-element-2adc3e1" data-id="2adc3e1" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap" bis_skin_checked="1">
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-top-section elementor-element elementor-element-842a92c elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="842a92c" data-element_type="section" id="features">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-c78207b" data-id="c78207b" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-498034d elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="498034d" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-inner-column elementor-element elementor-element-13ca1a3" data-id="13ca1a3" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-e6b961a elementor-widget elementor-widget-elementskit-heading" data-id="e6b961a" data-element_type="widget" data-widget_type="elementskit-heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"><div class="ekit-heading elementskit-section-title-wraper center   ekit_heading_tablet-   ekit_heading_mobile-" bis_skin_checked="1"><h2 class="ekit-heading--title elementskit-section-title ">Serba Bisa Serba Gratis Selamanya</h2> <div class="ekit-heading__description" bis_skin_checked="1">
+<p>Temukan beragam pilihan produk yang sesuai dengan kebutuhan Anda dan nikmati semuanya secara GRATIS hanya di CepatCloud.id&nbsp;</p>
+<p>&nbsp;</p>
+</div>
+</div></div> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-4b4c13a elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="4b4c13a" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-4e5bb60" data-id="4e5bb60" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-bbdc792 elementor-widget elementor-widget-image" data-id="bbdc792" data-element_type="widget" data-settings="{&quot;_animation&quot;:&quot;none&quot;}" data-widget_type="image.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<img data-lazyloaded="1" data-placeholder-resp="1128x871" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMTI4IiBoZWlnaHQ9Ijg3MSIgdmlld0JveD0iMCAwIDExMjggODcxIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBzdHlsZT0iZmlsbDojY2ZkNGRiO2ZpbGwtb3BhY2l0eTogMC4xOyIvPjwvc3ZnPg==" decoding="async" width="1128" height="871" data-src="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_server_cluster_jwwq.webp" class="attachment-full size-full wp-image-1957" alt="hosting vps gratis domain" data-srcset="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_server_cluster_jwwq.webp 1128w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_server_cluster_jwwq-300x232.webp 300w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_server_cluster_jwwq-1024x791.webp 1024w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_server_cluster_jwwq-768x593.webp 768w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_server_cluster_jwwq-600x463.webp 600w" data-sizes="(max-width: 1128px) 100vw, 1128px"> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-1cf76f9" data-id="1cf76f9" data-element_type="column" data-settings="{&quot;animation&quot;:&quot;none&quot;}" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-44d1460 elementor-widget elementor-widget-heading" data-id="44d1460" data-element_type="widget" data-settings="{&quot;_animation&quot;:&quot;none&quot;}" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<style>/*! elementor - v3.14.0 - 26-06-2023 */
+.elementor-heading-title{padding:0;margin:0;line-height:1}.elementor-widget-heading .elementor-heading-title[class*=elementor-size-]>a{color:inherit;font-size:inherit;line-height:inherit}.elementor-widget-heading .elementor-heading-title.elementor-size-small{font-size:15px}.elementor-widget-heading .elementor-heading-title.elementor-size-medium{font-size:19px}.elementor-widget-heading .elementor-heading-title.elementor-size-large{font-size:29px}.elementor-widget-heading .elementor-heading-title.elementor-size-xl{font-size:39px}.elementor-widget-heading .elementor-heading-title.elementor-size-xxl{font-size:59px}</style><h6 class="elementor-heading-title elementor-size-default">hardware terbaik</h6> </div>
+</div>
+<div class="elementor-element elementor-element-7789145 elementor-widget elementor-widget-heading" data-id="7789145" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h2 class="elementor-heading-title elementor-size-default">Hardware Terbaik di Kelasnya</h2> </div>
+</div>
+<div class="elementor-element elementor-element-41c78ce elementor-widget elementor-widget-text-editor" data-id="41c78ce" data-element_type="widget" data-widget_type="text-editor.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<style>/*! elementor - v3.14.0 - 26-06-2023 */
+.elementor-widget-text-editor.elementor-drop-cap-view-stacked .elementor-drop-cap{background-color:#69727d;color:#fff}.elementor-widget-text-editor.elementor-drop-cap-view-framed .elementor-drop-cap{color:#69727d;border:3px solid;background-color:transparent}.elementor-widget-text-editor:not(.elementor-drop-cap-view-default) .elementor-drop-cap{margin-top:8px}.elementor-widget-text-editor:not(.elementor-drop-cap-view-default) .elementor-drop-cap-letter{width:1em;height:1em}.elementor-widget-text-editor .elementor-drop-cap{float:left;text-align:center;line-height:1;font-size:50px}.elementor-widget-text-editor .elementor-drop-cap-letter{display:inline-block}</style> <p>Kami menggunakan infrastruktur hardware yang sangat cepat dan efisien untuk melayani segala kebutuhan online Anda.</p> </div>
+</div>
+<div class="elementor-element elementor-element-f7ab878 elementor-tablet-align-left elementor-icon-list--layout-traditional elementor-list-item-link-full_width elementor-widget elementor-widget-icon-list" data-id="f7ab878" data-element_type="widget" data-widget_type="icon-list.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<link rel="stylesheet" href="./index_files/widget-icon-list.min.css"> <ul class="elementor-icon-list-items">
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">High Performance Hardware</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Pure SSD NVMe Storage</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-43450f5 elementor-section-content-middle elementor-reverse-tablet elementor-reverse-mobile elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="43450f5" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-03ede56" data-id="03ede56" data-element_type="column" data-settings="{&quot;animation&quot;:&quot;none&quot;}" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-a1053aa elementor-widget elementor-widget-heading" data-id="a1053aa" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h6 class="elementor-heading-title elementor-size-default">jaringan tercepat</h6> </div>
+</div>
+<div class="elementor-element elementor-element-3aee4d3 elementor-widget elementor-widget-heading" data-id="3aee4d3" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h2 class="elementor-heading-title elementor-size-default">Desain Jaringan Kelas Dunia </h2> </div>
+</div>
+<div class="elementor-element elementor-element-30e8375 elementor-widget elementor-widget-text-editor" data-id="30e8375" data-element_type="widget" data-widget_type="text-editor.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<p>Memastikan server selalu online dan cepat di akses dari seluruh dunia.</p> </div>
+</div>
+<div class="elementor-element elementor-element-a7272d5 elementor-icon-list--layout-traditional elementor-list-item-link-full_width elementor-widget elementor-widget-icon-list" data-id="a7272d5" data-element_type="widget" data-widget_type="icon-list.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<ul class="elementor-icon-list-items">
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Unlimited Bandwith</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Multi Network Exchange and Upstream</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Up To 10Gb/s Network Speed</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Secure with Anti DDOS</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">99% Uptime Guaranteed</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">IPv4 - IPv6 Enable</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-8e87113" data-id="8e87113" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-88a150a elementor-widget elementor-widget-image" data-id="88a150a" data-element_type="widget" data-settings="{&quot;_animation&quot;:&quot;none&quot;}" data-widget_type="image.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<img data-lazyloaded="1" data-placeholder-resp="1417x1034" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNDE3IiBoZWlnaHQ9IjEwMzQiIHZpZXdCb3g9IjAgMCAxNDE3IDEwMzQiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHN0eWxlPSJmaWxsOiNjZmQ0ZGI7ZmlsbC1vcGFjaXR5OiAwLjE7Ii8+PC9zdmc+" decoding="async" width="1417" height="1034" data-src="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_connected_world_wuay.webp" class="attachment-full size-full wp-image-1954" alt="cepatcloud gratis" data-srcset="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_connected_world_wuay.webp 1417w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_connected_world_wuay-300x219.webp 300w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_connected_world_wuay-1024x747.webp 1024w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_connected_world_wuay-768x560.webp 768w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_connected_world_wuay-600x438.webp 600w" data-sizes="(max-width: 1417px) 100vw, 1417px"> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-9cf212f elementor-section-content-middle elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="9cf212f" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-3ab93bc" data-id="3ab93bc" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-9b6c2ad elementor-widget elementor-widget-image" data-id="9b6c2ad" data-element_type="widget" data-settings="{&quot;_animation&quot;:&quot;none&quot;}" data-widget_type="image.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<img data-lazyloaded="1" data-placeholder-resp="1153x643" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMTUzIiBoZWlnaHQ9IjY0MyIgdmlld0JveD0iMCAwIDExNTMgNjQzIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBzdHlsZT0iZmlsbDojY2ZkNGRiO2ZpbGwtb3BhY2l0eTogMC4xOyIvPjwvc3ZnPg==" decoding="async" width="1153" height="643" data-src="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Operating_system_re_iqsc.webp" class="attachment-full size-full wp-image-1955" alt="cepatcloud gratis" data-srcset="https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Operating_system_re_iqsc.webp 1153w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Operating_system_re_iqsc-300x167.webp 300w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Operating_system_re_iqsc-1024x571.webp 1024w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Operating_system_re_iqsc-768x428.webp 768w, https://cepatcloud.id/wp-content/uploads/2022/02/undraw_Operating_system_re_iqsc-600x335.webp 600w" data-sizes="(max-width: 1153px) 100vw, 1153px"> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-4f4f1d0" data-id="4f4f1d0" data-element_type="column" data-settings="{&quot;animation&quot;:&quot;none&quot;}" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-21330d2 elementor-widget elementor-widget-heading" data-id="21330d2" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h6 class="elementor-heading-title elementor-size-default">software terlengkap</h6> </div>
+</div>
+<div class="elementor-element elementor-element-fffac12 elementor-widget elementor-widget-heading" data-id="fffac12" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h2 class="elementor-heading-title elementor-size-default">Pilihan Software Terlengkap</h2> </div>
+</div>
+<div class="elementor-element elementor-element-2f5423e elementor-widget elementor-widget-text-editor" data-id="2f5423e" data-element_type="widget" data-widget_type="text-editor.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<p>Setiap software pada infrastruktur yang kami gunakan adalah software terbaik dan tentunya open source, mulai dari level virtualisasi hingga web server kami.</p> </div>
+</div>
+<div class="elementor-element elementor-element-719e8f4 elementor-icon-list--layout-traditional elementor-list-item-link-full_width elementor-widget elementor-widget-icon-list" data-id="719e8f4" data-element_type="widget" data-widget_type="icon-list.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<ul class="elementor-icon-list-items">
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Litespeed Webserver</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">MariaDB</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Pure-FTPD</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Multiple PHP Version</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">HTTP/3 + QUIC + Brotli</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Auto Installer</span>
+</li>
+<li class="elementor-icon-list-item">
+<span class="elementor-icon-list-icon">
+<svg aria-hidden="true" class="e-font-icon-svg e-fas-check-circle" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M504 256c0 136.967-111.033 248-248 248S8 392.967 8 256 119.033 8 256 8s248 111.033 248 248zM227.314 387.314l184-184c6.248-6.248 6.248-16.379 0-22.627l-22.627-22.627c-6.248-6.249-16.379-6.249-22.628 0L216 308.118l-70.059-70.059c-6.248-6.248-16.379-6.248-22.628 0l-22.627 22.627c-6.248 6.248-6.248 16.379 0 22.627l104 104c6.249 6.249 16.379 6.249 22.628.001z"></path></svg> </span>
+<span class="elementor-icon-list-text">Free SSL</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-top-section elementor-element elementor-element-28a3a1ce elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="28a3a1ce" data-element_type="section" id="xs_faq_5">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-21dba00e" data-id="21dba00e" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-ef33fdd elementor-widget elementor-widget-elementskit-heading" data-id="ef33fdd" data-element_type="widget" data-widget_type="elementskit-heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"><div class="ekit-heading elementskit-section-title-wraper center   ekit_heading_tablet-   ekit_heading_mobile-" bis_skin_checked="1"><h2 class="ekit-heading--title elementskit-section-title ">FAQ</h2> <div class="ekit-heading__description" bis_skin_checked="1">
+<p><span style="font-weight: 400">Beberapa pertanyaan yang sering ditanyakan pengguna kami.</span></p>
+</div>
+</div></div> </div>
+</div>
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-4a61b2fe elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="4a61b2fe" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-d82e56d" data-id="d82e56d" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-9a02b5 elementor-widget elementor-widget-elementskit-faq" data-id="9a02b5" data-element_type="widget" data-widget_type="elementskit-faq.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-faq elementor-repeater-item-ccb3fc9" bis_skin_checked="1">
+<div class="elementskit-faq-header" bis_skin_checked="1">
+<h2 class="elementskit-faq-title">Siapa kami?</h2>
+</div>
+<div class="elementskit-faq-body" bis_skin_checked="1">
+Salah satu penyedia cloud service yang menyediakan layanannya secara gratis khusus untuk pengguna di Indonesia. </div>
+</div>
+<div class="elementskit-single-faq elementor-repeater-item-1219655" bis_skin_checked="1">
+<div class="elementskit-faq-header" bis_skin_checked="1">
+<h2 class="elementskit-faq-title">Kenapa gratis, untungnya dari mana?</h2>
+</div>
+<div class="elementskit-faq-body" bis_skin_checked="1">
+Kami non-profit tujuan utama kami untuk membantu masyarakat yang terbentur biaya dalam mengakses layanan cloud services. Selain itu semua software yang kami gunakan juga open source jadi kami tidak memerlukan biaya lisensi aplikasi. Jika anda ingin membantu project kami anda dapat memberikan sumbangan melalui menu donasi di atas atau dalam bentuk apapun termasuk server dalam kondisi bekas atau baru (part server, server fisik, hardisk , ssd, colocation, switch, router, IP public, dll) </div>
+</div>
+<div class="elementskit-single-faq elementor-repeater-item-31ebcfd" bis_skin_checked="1">
+<div class="elementskit-faq-header" bis_skin_checked="1">
+<h2 class="elementskit-faq-title">Apakah layanan gratis bisa dipakai selamanya?</h2>
+</div>
+<div class="elementskit-faq-body" bis_skin_checked="1">
+Ya, Layanan gratis bisa dipakai selamanya selama tidak melanggar aturan pada halaman ini. </div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-6916bd4f" data-id="6916bd4f" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-2e1539ec elementor-widget elementor-widget-elementskit-faq" data-id="2e1539ec" data-element_type="widget" data-widget_type="elementskit-faq.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1">
+<div class="elementskit-single-faq elementor-repeater-item-e12c595" bis_skin_checked="1">
+<div class="elementskit-faq-header" bis_skin_checked="1">
+<h2 class="elementskit-faq-title">Data anda disimpan dimana?</h2>
+</div>
+<div class="elementskit-faq-body" bis_skin_checked="1">
+Semua server kami berada di Indonesia. </div>
+</div>
+<div class="elementskit-single-faq elementor-repeater-item-5f94b9e" bis_skin_checked="1">
+<div class="elementskit-faq-header" bis_skin_checked="1">
+<h2 class="elementskit-faq-title">Kapan dan berapa lama proses aktifasi layanan gratis?</h2>
+</div>
+<div class="elementskit-faq-body" bis_skin_checked="1">
+Kami tidak bisa menjanjikan permintaan layanan gratis bisa diaktifkan secepat mungkin.
+</div>
+</div>
+<div class="elementskit-single-faq elementor-repeater-item-ad5f942" bis_skin_checked="1">
+<div class="elementskit-faq-header" bis_skin_checked="1">
+<h2 class="elementskit-faq-title">Apakah saya bisa memiliki beberapa layanan gratis di cepatcloud.id?</h2>
+</div>
+<div class="elementskit-faq-body" bis_skin_checked="1">
+Khusus untuk web hostig dan VPS, layanan yang bisa diberikan hanya salah satu dari dua layanan tersebut untuk masing-masing pengguna. </div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-top-section elementor-element elementor-element-2759892 elementor-section-height-min-height elementor-section-boxed elementor-section-height-default elementor-section-items-middle" data-id="2759892" data-element_type="section" id="contact">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-b0e45e5" data-id="b0e45e5" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-0a01fda elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="0a01fda" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-inner-column elementor-element elementor-element-8447c20" data-id="8447c20" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-9aeff1b elementor-widget elementor-widget-elementskit-heading" data-id="9aeff1b" data-element_type="widget" data-settings="{&quot;_animation&quot;:&quot;none&quot;}" data-widget_type="elementskit-heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"><div class="ekit-heading elementskit-section-title-wraper center   ekit_heading_tablet-   ekit_heading_mobile-" bis_skin_checked="1"><h2 class="ekit-heading--title elementskit-section-title ">Hubungi Kami!</h2> <div class="ekit-heading__description" bis_skin_checked="1">
+<p>Apabila ada pertanyaan seputar layanan, kritik, saran, donasi, kerjasama, maupun permintaan yang lain, hubungi Kami melalui admin@cepatcloud.id</p>
+</div>
+</div></div> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</section>
+<section class="elementor-section elementor-top-section elementor-element elementor-element-d5a0b31 elementor-section-height-min-height elementor-section-content-middle elementor-section-boxed elementor-section-height-default elementor-section-items-middle" data-id="d5a0b31" data-element_type="section" data-settings="{&quot;background_background&quot;:&quot;classic&quot;}">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-1cabf7a" data-id="1cabf7a" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<section class="elementor-section elementor-inner-section elementor-element elementor-element-69b5834 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="69b5834" data-element_type="section">
+<div class="elementor-container elementor-column-gap-default" bis_skin_checked="1">
+<div class="elementor-column elementor-col-50 elementor-inner-column elementor-element elementor-element-e705812" data-id="e705812" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-59d80f8 elementor-widget elementor-widget-heading" data-id="59d80f8" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h2 class="elementor-heading-title elementor-size-default">CepatCloud.id</h2> </div>
+</div>
+<div class="elementor-element elementor-element-da4eb7d elementor-widget elementor-widget-text-editor" data-id="da4eb7d" data-element_type="widget" data-widget_type="text-editor.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<p style="text-align: left;"><strong>CepatCloud.id</strong> merupakan salah satu peneyedia layanan cloud yang menyediakan layanannya secara gratis khusus untuk pengguna di Indonesia.</p>
+<p>Perum karangploso View AA 3 Karangploso <br>Malang – Indonesia (65152)</p> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-25 elementor-inner-column elementor-element elementor-element-6b15720" data-id="6b15720" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-2ebeee6 elementor-widget elementor-widget-heading" data-id="2ebeee6" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h2 class="elementor-heading-title elementor-size-default">Navigasi</h2> </div>
+</div>
+<div class="elementor-element elementor-element-cc68d93 elementor-mobile-align-left elementor-widget elementor-widget-elementskit-page-list" data-id="cc68d93" data-element_type="widget" data-widget_type="elementskit-page-list.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"> <div class="elementor-icon-list-items " bis_skin_checked="1">
+<div class="elementor-icon-list-item   " bis_skin_checked="1">
+<a class="elementor-repeater-item-953f2c5 ekit_badge_left" href="https://cepatcloud.id/#home" rel="nofollow">
+<div class="ekit_page_list_content" bis_skin_checked="1">
+<span class="elementor-icon-list-text">
+<span class="ekit_page_list_title_title">Home</span>
+</span>
+</div>
+</a>
+</div>
+<div class="elementor-icon-list-item   " bis_skin_checked="1">
+<a class="elementor-repeater-item-dbf2930 ekit_badge_left" href="https://cepatcloud.id/#about" target="_blank" rel="nofollow">
+<div class="ekit_page_list_content" bis_skin_checked="1">
+<span class="elementor-icon-list-text">
+<span class="ekit_page_list_title_title">About</span>
+</span>
+</div>
+</a>
+</div>
+<div class="elementor-icon-list-item   " bis_skin_checked="1">
+<a class="elementor-repeater-item-12f2a2b ekit_badge_left" href="https://cepatcloud.id/#pricing" target="_blank" rel="nofollow">
+<div class="ekit_page_list_content" bis_skin_checked="1">
+<span class="elementor-icon-list-text">
+<span class="ekit_page_list_title_title">Pricing</span>
+</span>
+</div>
+</a>
+</div>
+<div class="elementor-icon-list-item   " bis_skin_checked="1">
+<a class="elementor-repeater-item-959b615 ekit_badge_left" href="https://cepatcloud.id/#features" target="_blank" rel="nofollow">
+<div class="ekit_page_list_content" bis_skin_checked="1">
+<span class="elementor-icon-list-text">
+<span class="ekit_page_list_title_title">Features</span>
+</span>
+</div>
+</a>
+</div>
+<div class="elementor-icon-list-item   " bis_skin_checked="1">
+<a class="elementor-repeater-item-04f3679 ekit_badge_left" href="https://cepatcloud.id/#contact" target="_blank" rel="nofollow">
+<div class="ekit_page_list_content" bis_skin_checked="1">
+<span class="elementor-icon-list-text">
+<span class="ekit_page_list_title_title">Contact</span>
+</span>
+</div>
+</a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+<div class="elementor-column elementor-col-25 elementor-inner-column elementor-element elementor-element-9faed82" data-id="9faed82" data-element_type="column" bis_skin_checked="1">
+<div class="elementor-widget-wrap elementor-element-populated" bis_skin_checked="1">
+<div class="elementor-element elementor-element-711ca7a elementor-widget elementor-widget-heading" data-id="711ca7a" data-element_type="widget" data-widget_type="heading.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<h2 class="elementor-heading-title elementor-size-default">Legal</h2> </div>
+</div>
+<div class="elementor-element elementor-element-123dbca elementor-mobile-align-left elementor-widget elementor-widget-elementskit-page-list" data-id="123dbca" data-element_type="widget" data-widget_type="elementskit-page-list.default" bis_skin_checked="1">
+<div class="elementor-widget-container" bis_skin_checked="1">
+<div class="ekit-wid-con" bis_skin_checked="1"> <div class="elementor-icon-list-items " bis_skin_checked="1">
+<div class="elementor-icon-list-item   " bis_skin_checked="1">
+<a class="elementor-repeater-item-dbf2930 ekit_badge_left" href="https://cepatcloud.id/kebijakan-privasi/" target="_blank" rel="nofollow">
+<div class="ekit_page_list_content" bis_skin_checked="1">
+<span class="elementor-icon-list-text">
+<span class="ekit_page_list_title_title">Privacy Policy</span>
+</span>
+</div>
+</a>
+</div>
+<div class="elementor-icon-list-item   " bis_skin_checked="1">
+<a class="elementor-repeater-item-953f2c5 ekit_badge_left" href="https://cepatcloud.id/terms-of-services/" rel="nofollow">
+<div class="ekit_page_list_content" bis_skin_checked="1">
+<span class="elementor-icon-list-text">
+<span class="ekit_page_list_title_title">Terms of Service</span>
+</span>
+</div>
+</a>
+</div>
+</div>
+</div> </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<footer id="footer" class="site-footer" itemscope="itemscope" itemtype="https://schema.org/WPFooter" role="contentinfo">
+<div id="footer-inner" class="clr" bis_skin_checked="1">
+<div id="footer-bottom" class="clr no-footer-nav" bis_skin_checked="1">
+<div id="footer-bottom-inner" class="container clr" bis_skin_checked="1">
+<div id="copyright" class="clr" role="contentinfo" bis_skin_checked="1">
+Copyright © 2023 CepatCloud.id </div>
+</div>
+</div>
+</div>
+</footer>
+</div>
+</div>
+<a aria-label="Scroll to the top of the page" href="https://cepatcloud.id/#" id="scroll-top" class="scroll-top-right"><i class=" fa fa-angle-up" aria-hidden="true" role="img"></i></a>
+<div id="owp-qv-wrap" bis_skin_checked="1">
+<div class="owp-qv-container" bis_skin_checked="1">
+<div class="owp-qv-content-wrap" bis_skin_checked="1">
+<div class="owp-qv-content-inner" bis_skin_checked="1">
+<a href="https://cepatcloud.id/#" class="owp-qv-close" aria-label="Close quick preview">×</a>
+<div id="owp-qv-content" class="woocommerce single-product" bis_skin_checked="1"></div>
+</div>
+</div>
+</div>
+<div class="owp-qv-overlay" bis_skin_checked="1"></div>
+</div>
+<script type="text/javascript">
+		(function () {
+			var c = document.body.className;
+			c = c.replace(/woocommerce-no-js/, 'woocommerce-js');
+			document.body.className = c;
+		})();
+	</script>
+<script src="./index_files/jquery.blockUI.min.js.download" id="jquery-blockui-js"></script>
+<script id="wc-add-to-cart-js-extra">
+var wc_add_to_cart_params = {"ajax_url":"\/wp-admin\/admin-ajax.php","wc_ajax_url":"\/?wc-ajax=%%endpoint%%","i18n_view_cart":"Lihat keranjang","cart_url":"https:\/\/cepatcloud.id\/cart\/","is_cart":"","cart_redirect_after_add":"yes"};
+</script>
+<script src="./index_files/add-to-cart.min.js.download" id="wc-add-to-cart-js"></script>
+<script src="./index_files/js.cookie.min.js.download" id="js-cookie-js"></script>
+<script id="woocommerce-js-extra">
+var woocommerce_params = {"ajax_url":"\/wp-admin\/admin-ajax.php","wc_ajax_url":"\/?wc-ajax=%%endpoint%%"};
+</script>
+<script src="./index_files/woocommerce.min.js.download" id="woocommerce-js"></script>
+<script src="./index_files/imagesloaded.min.js.download" id="imagesloaded-js"></script>
+<script id="oceanwp-main-js-extra">
+var oceanwpLocalize = {"nonce":"f3ed8eb2e5","isRTL":"","menuSearchStyle":"disabled","mobileMenuSearchStyle":"disabled","sidrSource":null,"sidrDisplace":"1","sidrSide":"left","sidrDropdownTarget":"link","verticalHeaderTarget":"link","customScrollOffset":"0","customSelects":".woocommerce-ordering .orderby, #dropdown_product_cat, .widget_categories select, .widget_archive select, .single-product .variations_form .variations select","wooCartStyle":null,"ajax_url":"https:\/\/cepatcloud.id\/wp-admin\/admin-ajax.php","cart_url":"https:\/\/cepatcloud.id\/cart\/","cart_redirect_after_add":"yes","view_cart":"View cart","floating_bar":"on","grouped_text":"View products","multistep_checkout_error":"Some required fields are empty. Please fill the required fields to go to the next step.","oe_mc_wpnonce":"b8d6e45919"};
+</script>
+<script src="./index_files/theme.min.js.download" id="oceanwp-main-js"></script>
+<script src="./index_files/drop-down-mobile-menu.min.js.download" id="oceanwp-drop-down-mobile-menu-js"></script>
+<script src="./index_files/magnific-popup.min.js.download" id="ow-magnific-popup-js"></script>
+<script src="./index_files/ow-lightbox.min.js.download" id="oceanwp-lightbox-js"></script>
+<script src="./index_files/flickity.pkgd.min.js.download" id="ow-flickity-js"></script>
+<script src="./index_files/ow-slider.min.js.download" id="oceanwp-slider-js"></script>
+<script src="./index_files/scroll-effect.min.js.download" id="oceanwp-scroll-effect-js"></script>
+<script src="./index_files/scroll-top.min.js.download" id="oceanwp-scroll-top-js"></script>
+<ins class="adsbygoogle adsbygoogle-noablate" data-adsbygoogle-status="done" style="display: none !important;" data-ad-status="unfilled"><div id="aswift_0_host" style="border: none; height: 0px; width: 0px; margin: 0px; padding: 0px; position: relative; visibility: visible; background-color: transparent; display: inline-block;" tabindex="0" title="Advertisement" aria-label="Advertisement" bis_skin_checked="1"><iframe id="aswift_0" name="aswift_0" style="left:0;position:absolute;top:0;border:0;width:undefinedpx;height:undefinedpx;" sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation" frameborder="0" marginwidth="0" marginheight="0" vspace="0" hspace="0" allowtransparency="true" scrolling="no" src="./index_files/ads(1).html" data-google-container-id="a!1" data-load-complete="true"></iframe></div></ins><script src="./index_files/select.min.js.download" id="oceanwp-select-js"></script>
+<script id="oceanwp-woocommerce-custom-features-js-extra">
+var oceanwpLocalize = {"nonce":"f3ed8eb2e5","isRTL":"","menuSearchStyle":"disabled","mobileMenuSearchStyle":"disabled","sidrSource":null,"sidrDisplace":"1","sidrSide":"left","sidrDropdownTarget":"link","verticalHeaderTarget":"link","customScrollOffset":"0","customSelects":".woocommerce-ordering .orderby, #dropdown_product_cat, .widget_categories select, .widget_archive select, .single-product .variations_form .variations select","wooCartStyle":null,"ajax_url":"https:\/\/cepatcloud.id\/wp-admin\/admin-ajax.php","cart_url":"https:\/\/cepatcloud.id\/cart\/","cart_redirect_after_add":"yes","view_cart":"View cart","floating_bar":"on","grouped_text":"View products","multistep_checkout_error":"Some required fields are empty. Please fill the required fields to go to the next step.","oe_mc_wpnonce":"b8d6e45919"};
+</script>
+<script src="./index_files/woo-custom-features.min.js.download" id="oceanwp-woocommerce-custom-features-js"></script>
+<script src="./index_files/frontend-script.js.download" id="elementskit-framework-js-frontend-js"></script>
+<script id="elementskit-framework-js-frontend-js-after">
+		var elementskit = {
+			resturl: 'https://cepatcloud.id/wp-json/elementskit/v1/',
+		}
+
+		
+</script>
+<script src="./index_files/widget-scripts.js.download" id="ekit-widget-scripts-js"></script>
+<script src="./index_files/woo-quick-view.min.js.download" id="oceanwp-woo-quick-view-js"></script>
+<script src="./index_files/underscore.min.js.download" id="underscore-js"></script>
+<script id="wp-util-js-extra">
+var _wpUtilSettings = {"ajax":{"url":"\/wp-admin\/admin-ajax.php"}};
+</script>
+<script src="./index_files/wp-util.min.js.download" id="wp-util-js"></script>
+<script id="wc-add-to-cart-variation-js-extra">
+var wc_add_to_cart_variation_params = {"wc_ajax_url":"\/?wc-ajax=%%endpoint%%","i18n_no_matching_variations_text":"Maaf, tidak ada produk yang cocok dengan pilihan Anda. Silakan pilih kombinasi yang berbeda.","i18n_make_a_selection_text":"Silakan pilih beberapa pilihan produk sebelum menambahkan produk ini ke keranjang Anda.","i18n_unavailable_text":"Maaf, produk ini tidak tersedia. Mohon pilih kombinasi yang berbeda."};
+</script>
+<script src="./index_files/add-to-cart-variation.min.js.download" id="wc-add-to-cart-variation-js"></script>
+<script src="./index_files/jquery.flexslider.min.js.download" id="flexslider-js"></script>
+<script id="wc-cart-fragments-js-extra">
+var wc_cart_fragments_params = {"ajax_url":"\/wp-admin\/admin-ajax.php","wc_ajax_url":"\/?wc-ajax=%%endpoint%%","cart_hash_key":"wc_cart_hash_6ce9f3c30c7bbc4921022d16a0797673","fragment_name":"wc_fragments_6ce9f3c30c7bbc4921022d16a0797673","request_timeout":"5000"};
+</script>
+<script src="./index_files/cart-fragments.min.js.download" id="wc-cart-fragments-js"></script>
+<script src="./index_files/webpack.runtime.min.js.download" id="elementor-webpack-runtime-js"></script>
+<script src="./index_files/frontend-modules.min.js.download" id="elementor-frontend-modules-js"></script>
+<script src="./index_files/waypoints.min.js.download" id="elementor-waypoints-js"></script>
+<script src="./index_files/core.min.js.download" id="jquery-ui-core-js"></script>
+<script id="elementor-frontend-js-before">
+var elementorFrontendConfig = {"environmentMode":{"edit":false,"wpPreview":false,"isScriptDebug":false},"i18n":{"shareOnFacebook":"Bagikan di Facebook","shareOnTwitter":"Bagikan di Twitter","pinIt":"Buat Pin","download":"Unduh","downloadImage":"Unduh gambar","fullscreen":"Layar Penuh","zoom":"Perbesar","share":"Bagikan","playVideo":"Putar Video","previous":"Sebelumnya","next":"Selanjutnya","close":"Tutup","a11yCarouselWrapperAriaLabel":"Carousel | Horizontal scrolling: Arrow Left & Right","a11yCarouselPrevSlideMessage":"Previous slide","a11yCarouselNextSlideMessage":"Next slide","a11yCarouselFirstSlideMessage":"This is the first slide","a11yCarouselLastSlideMessage":"This is the last slide","a11yCarouselPaginationBulletMessage":"Go to slide"},"is_rtl":false,"breakpoints":{"xs":0,"sm":480,"md":768,"lg":1025,"xl":1440,"xxl":1600},"responsive":{"breakpoints":{"mobile":{"label":"Mobile Portrait","value":767,"default_value":767,"direction":"max","is_enabled":true},"mobile_extra":{"label":"Mobile Landscape","value":880,"default_value":880,"direction":"max","is_enabled":false},"tablet":{"label":"Tablet Portrait","value":1024,"default_value":1024,"direction":"max","is_enabled":true},"tablet_extra":{"label":"Tablet Landscape","value":1200,"default_value":1200,"direction":"max","is_enabled":false},"laptop":{"label":"Laptop","value":1366,"default_value":1366,"direction":"max","is_enabled":false},"widescreen":{"label":"Layar lebar","value":2400,"default_value":2400,"direction":"min","is_enabled":false}}},"version":"3.14.1","is_static":false,"experimentalFeatures":{"e_dom_optimization":true,"e_optimized_assets_loading":true,"e_optimized_css_loading":true,"e_font_icon_svg":true,"a11y_improvements":true},"urls":{"assets":"https:\/\/cepatcloud.id\/wp-content\/plugins\/elementor\/assets\/"},"swiperClass":"swiper-container","settings":{"page":[],"editorPreferences":[]},"kit":{"active_breakpoints":["viewport_mobile","viewport_tablet"],"global_image_lightbox":"yes","lightbox_enable_counter":"yes","lightbox_enable_fullscreen":"yes","lightbox_enable_zoom":"yes","lightbox_enable_share":"yes","lightbox_title_src":"title","lightbox_description_src":"description"},"post":{"id":11,"title":"Hosting%20VPS%20Gratis%20Indonesia","excerpt":"","featuredImage":false},"user":{"roles":["customer"]}};
+</script>
+<script src="./index_files/frontend.min.js.download" id="elementor-frontend-js"></script><span id="elementor-device-mode" class="elementor-screen-only"></span>
+<script src="./index_files/animate-circle.min.js.download" id="animate-circle-js"></script>
+<script id="elementskit-elementor-js-extra">
+var ekit_config = {"ajaxurl":"https:\/\/cepatcloud.id\/wp-admin\/admin-ajax.php","nonce":"a9ec9f9293"};
+</script>
+<script src="./index_files/elementor.js.download" id="elementskit-elementor-js"></script>
+<script data-no-optimize="1">!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t="undefined"!=typeof globalThis?globalThis:t||self).LazyLoad=e()}(this,function(){"use strict";function e(){return(e=Object.assign||function(t){for(var e=1;e<arguments.length;e++){var n,a=arguments[e];for(n in a)Object.prototype.hasOwnProperty.call(a,n)&&(t[n]=a[n])}return t}).apply(this,arguments)}function i(t){return e({},it,t)}function o(t,e){var n,a="LazyLoad::Initialized",i=new t(e);try{n=new CustomEvent(a,{detail:{instance:i}})}catch(t){(n=document.createEvent("CustomEvent")).initCustomEvent(a,!1,!1,{instance:i})}window.dispatchEvent(n)}function l(t,e){return t.getAttribute(gt+e)}function c(t){return l(t,bt)}function s(t,e){return function(t,e,n){e=gt+e;null!==n?t.setAttribute(e,n):t.removeAttribute(e)}(t,bt,e)}function r(t){return s(t,null),0}function u(t){return null===c(t)}function d(t){return c(t)===vt}function f(t,e,n,a){t&&(void 0===a?void 0===n?t(e):t(e,n):t(e,n,a))}function _(t,e){nt?t.classList.add(e):t.className+=(t.className?" ":"")+e}function v(t,e){nt?t.classList.remove(e):t.className=t.className.replace(new RegExp("(^|\\s+)"+e+"(\\s+|$)")," ").replace(/^\s+/,"").replace(/\s+$/,"")}function g(t){return t.llTempImage}function b(t,e){!e||(e=e._observer)&&e.unobserve(t)}function p(t,e){t&&(t.loadingCount+=e)}function h(t,e){t&&(t.toLoadCount=e)}function n(t){for(var e,n=[],a=0;e=t.children[a];a+=1)"SOURCE"===e.tagName&&n.push(e);return n}function m(t,e){(t=t.parentNode)&&"PICTURE"===t.tagName&&n(t).forEach(e)}function a(t,e){n(t).forEach(e)}function E(t){return!!t[st]}function I(t){return t[st]}function y(t){return delete t[st]}function A(e,t){var n;E(e)||(n={},t.forEach(function(t){n[t]=e.getAttribute(t)}),e[st]=n)}function k(a,t){var i;E(a)&&(i=I(a),t.forEach(function(t){var e,n;e=a,(t=i[n=t])?e.setAttribute(n,t):e.removeAttribute(n)}))}function L(t,e,n){_(t,e.class_loading),s(t,ut),n&&(p(n,1),f(e.callback_loading,t,n))}function w(t,e,n){n&&t.setAttribute(e,n)}function x(t,e){w(t,ct,l(t,e.data_sizes)),w(t,rt,l(t,e.data_srcset)),w(t,ot,l(t,e.data_src))}function O(t,e,n){var a=l(t,e.data_bg_multi),i=l(t,e.data_bg_multi_hidpi);(a=at&&i?i:a)&&(t.style.backgroundImage=a,n=n,_(t=t,(e=e).class_applied),s(t,ft),n&&(e.unobserve_completed&&b(t,e),f(e.callback_applied,t,n)))}function N(t,e){!e||0<e.loadingCount||0<e.toLoadCount||f(t.callback_finish,e)}function C(t,e,n){t.addEventListener(e,n),t.llEvLisnrs[e]=n}function M(t){return!!t.llEvLisnrs}function z(t){if(M(t)){var e,n,a=t.llEvLisnrs;for(e in a){var i=a[e];n=e,i=i,t.removeEventListener(n,i)}delete t.llEvLisnrs}}function R(t,e,n){var a;delete t.llTempImage,p(n,-1),(a=n)&&--a.toLoadCount,v(t,e.class_loading),e.unobserve_completed&&b(t,n)}function T(o,r,c){var l=g(o)||o;M(l)||function(t,e,n){M(t)||(t.llEvLisnrs={});var a="VIDEO"===t.tagName?"loadeddata":"load";C(t,a,e),C(t,"error",n)}(l,function(t){var e,n,a,i;n=r,a=c,i=d(e=o),R(e,n,a),_(e,n.class_loaded),s(e,dt),f(n.callback_loaded,e,a),i||N(n,a),z(l)},function(t){var e,n,a,i;n=r,a=c,i=d(e=o),R(e,n,a),_(e,n.class_error),s(e,_t),f(n.callback_error,e,a),i||N(n,a),z(l)})}function G(t,e,n){var a,i,o,r,c;t.llTempImage=document.createElement("IMG"),T(t,e,n),E(c=t)||(c[st]={backgroundImage:c.style.backgroundImage}),o=n,r=l(a=t,(i=e).data_bg),c=l(a,i.data_bg_hidpi),(r=at&&c?c:r)&&(a.style.backgroundImage='url("'.concat(r,'")'),g(a).setAttribute(ot,r),L(a,i,o)),O(t,e,n)}function D(t,e,n){var a;T(t,e,n),a=e,e=n,(t=It[(n=t).tagName])&&(t(n,a),L(n,a,e))}function V(t,e,n){var a;a=t,(-1<yt.indexOf(a.tagName)?D:G)(t,e,n)}function F(t,e,n){var a;t.setAttribute("loading","lazy"),T(t,e,n),a=e,(e=It[(n=t).tagName])&&e(n,a),s(t,vt)}function j(t){t.removeAttribute(ot),t.removeAttribute(rt),t.removeAttribute(ct)}function P(t){m(t,function(t){k(t,Et)}),k(t,Et)}function S(t){var e;(e=At[t.tagName])?e(t):E(e=t)&&(t=I(e),e.style.backgroundImage=t.backgroundImage)}function U(t,e){var n;S(t),n=e,u(e=t)||d(e)||(v(e,n.class_entered),v(e,n.class_exited),v(e,n.class_applied),v(e,n.class_loading),v(e,n.class_loaded),v(e,n.class_error)),r(t),y(t)}function $(t,e,n,a){var i;n.cancel_on_exit&&(c(t)!==ut||"IMG"===t.tagName&&(z(t),m(i=t,function(t){j(t)}),j(i),P(t),v(t,n.class_loading),p(a,-1),r(t),f(n.callback_cancel,t,e,a)))}function q(t,e,n,a){var i,o,r=(o=t,0<=pt.indexOf(c(o)));s(t,"entered"),_(t,n.class_entered),v(t,n.class_exited),i=t,o=a,n.unobserve_entered&&b(i,o),f(n.callback_enter,t,e,a),r||V(t,n,a)}function H(t){return t.use_native&&"loading"in HTMLImageElement.prototype}function B(t,i,o){t.forEach(function(t){return(a=t).isIntersecting||0<a.intersectionRatio?q(t.target,t,i,o):(e=t.target,n=t,a=i,t=o,void(u(e)||(_(e,a.class_exited),$(e,n,a,t),f(a.callback_exit,e,n,t))));var e,n,a})}function J(e,n){var t;et&&!H(e)&&(n._observer=new IntersectionObserver(function(t){B(t,e,n)},{root:(t=e).container===document?null:t.container,rootMargin:t.thresholds||t.threshold+"px"}))}function K(t){return Array.prototype.slice.call(t)}function Q(t){return t.container.querySelectorAll(t.elements_selector)}function W(t){return c(t)===_t}function X(t,e){return e=t||Q(e),K(e).filter(u)}function Y(e,t){var n;(n=Q(e),K(n).filter(W)).forEach(function(t){v(t,e.class_error),r(t)}),t.update()}function t(t,e){var n,a,t=i(t);this._settings=t,this.loadingCount=0,J(t,this),n=t,a=this,Z&&window.addEventListener("online",function(){Y(n,a)}),this.update(e)}var Z="undefined"!=typeof window,tt=Z&&!("onscroll"in window)||"undefined"!=typeof navigator&&/(gle|ing|ro)bot|crawl|spider/i.test(navigator.userAgent),et=Z&&"IntersectionObserver"in window,nt=Z&&"classList"in document.createElement("p"),at=Z&&1<window.devicePixelRatio,it={elements_selector:".lazy",container:tt||Z?document:null,threshold:300,thresholds:null,data_src:"src",data_srcset:"srcset",data_sizes:"sizes",data_bg:"bg",data_bg_hidpi:"bg-hidpi",data_bg_multi:"bg-multi",data_bg_multi_hidpi:"bg-multi-hidpi",data_poster:"poster",class_applied:"applied",class_loading:"litespeed-loading",class_loaded:"litespeed-loaded",class_error:"error",class_entered:"entered",class_exited:"exited",unobserve_completed:!0,unobserve_entered:!1,cancel_on_exit:!0,callback_enter:null,callback_exit:null,callback_applied:null,callback_loading:null,callback_loaded:null,callback_error:null,callback_finish:null,callback_cancel:null,use_native:!1},ot="src",rt="srcset",ct="sizes",lt="poster",st="llOriginalAttrs",ut="loading",dt="loaded",ft="applied",_t="error",vt="native",gt="data-",bt="ll-status",pt=[ut,dt,ft,_t],ht=[ot],mt=[ot,lt],Et=[ot,rt,ct],It={IMG:function(t,e){m(t,function(t){A(t,Et),x(t,e)}),A(t,Et),x(t,e)},IFRAME:function(t,e){A(t,ht),w(t,ot,l(t,e.data_src))},VIDEO:function(t,e){a(t,function(t){A(t,ht),w(t,ot,l(t,e.data_src))}),A(t,mt),w(t,lt,l(t,e.data_poster)),w(t,ot,l(t,e.data_src)),t.load()}},yt=["IMG","IFRAME","VIDEO"],At={IMG:P,IFRAME:function(t){k(t,ht)},VIDEO:function(t){a(t,function(t){k(t,ht)}),k(t,mt),t.load()}},kt=["IMG","IFRAME","VIDEO"];return t.prototype={update:function(t){var e,n,a,i=this._settings,o=X(t,i);{if(h(this,o.length),!tt&&et)return H(i)?(e=i,n=this,o.forEach(function(t){-1!==kt.indexOf(t.tagName)&&F(t,e,n)}),void h(n,0)):(t=this._observer,i=o,t.disconnect(),a=t,void i.forEach(function(t){a.observe(t)}));this.loadAll(o)}},destroy:function(){this._observer&&this._observer.disconnect(),Q(this._settings).forEach(function(t){y(t)}),delete this._observer,delete this._settings,delete this.loadingCount,delete this.toLoadCount},loadAll:function(t){var e=this,n=this._settings;X(t,n).forEach(function(t){b(t,e),V(t,n,e)})},restoreAll:function(){var e=this._settings;Q(e).forEach(function(t){U(t,e)})}},t.load=function(t,e){e=i(e);V(t,e)},t.resetStatus=function(t){r(t)},Z&&function(t,e){if(e)if(e.length)for(var n,a=0;n=e[a];a+=1)o(t,n);else o(t,e)}(t,window.lazyLoadOptions),t});!function(e,t){"use strict";function a(){t.body.classList.add("litespeed_lazyloaded")}function n(){console.log("[LiteSpeed] Start Lazy Load Images"),d=new LazyLoad({elements_selector:"[data-lazyloaded]",callback_finish:a}),o=function(){d.update()},e.MutationObserver&&new MutationObserver(o).observe(t.documentElement,{childList:!0,subtree:!0,attributes:!0})}var d,o;e.addEventListener?e.addEventListener("load",n,!1):e.attachEvent("onload",n)}(window,document);</script>
+
+<iframe src="./index_files/aframe.html" width="0" height="0" style="display: none;" bis_size="{&quot;x&quot;:0,&quot;y&quot;:0,&quot;w&quot;:0,&quot;h&quot;:0,&quot;abs_x&quot;:0,&quot;abs_y&quot;:0}"></iframe></body><iframe id="google_esf" name="google_esf" src="./index_files/zrt_lookup.html" style="display: none;"></iframe><iframe name="goog_topics_frame" src="./index_files/topics_frame.html" style="display: none;"></iframe></html>
